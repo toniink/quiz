@@ -1,7 +1,8 @@
 // src/context/AuthContext.js
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api, { loginUser } from '../services/api'; // Importe o 'api' e 'loginUser'
+// Importe o 'api' e o 'loginUser' diretamente do api.js
+import api, { loginUser } from '../services/api'; 
 
 // 1. Cria o Contexto
 const AuthContext = createContext();
@@ -9,14 +10,18 @@ const AuthContext = createContext();
 // 2. Cria o Provedor (Provider)
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Para a tela de loading
 
   // Verifica se há um token salvo ao iniciar o app
   useEffect(() => {
     const loadToken = async () => {
       try {
         const savedToken = await AsyncStorage.getItem('userToken');
-        setToken(savedToken);
+        if (savedToken) {
+          setToken(savedToken);
+          // IMPORTANTE: Define o token no Axios assim que o app carregar
+          api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+        }
       } catch (e) {
         console.error("Falha ao carregar token", e);
       } finally {
@@ -29,12 +34,13 @@ export function AuthProvider({ children }) {
   // Função de Login
   const login = async (email, password) => {
     // A lógica de login agora vive aqui
-    const response = await loginUser({ email, password });
+    const response = await loginUser({ email, password }); // Chama a API
     const newToken = response.data.token;
+    
     setToken(newToken);
     await AsyncStorage.setItem('userToken', newToken);
     
-    // Atualiza o header padrão do Axios após o login
+    // IMPORTANTE: Define o token no Axios no momento do login
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     
     return response.data; // Retorna os dados do usuário se necessário
@@ -62,7 +68,7 @@ export function AuthProvider({ children }) {
   );
 }
 
-// 3. Cria o Hook customizado
+// 3. Cria o Hook customizado (para ser fácil de usar)
 export const useAuth = () => {
   return useContext(AuthContext);
 };

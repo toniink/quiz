@@ -1,15 +1,15 @@
 // src/screens/LoginScreen.js
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { loginUser } from '../services/api';
-import { useAuth } from '../../App'; //
+// Importe do NOVO local (isso quebra o ciclo)
+import { useAuth } from '../context/AuthContext'; 
 
-// 'navigation' é injetado pelo React Navigation
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { setToken } = useAuth();
-  const { login } = useAuth(); // Pega a função de login do Contexto
+  
+  // Pega a função de login do Contexto
+  const { login } = useAuth(); // Esta linha (11) agora vai funcionar
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -17,8 +17,11 @@ export default function LoginScreen({ navigation }) {
       return;
     }
     try {
-        const response = await loginUser({ email, password });
-        await login(response.data.token); // Chama a função do contexto
+      // Chama a função 'login' do contexto
+      await login(email, password);
+      
+      // O App.js vai trocar a tela sozinho
+      
     } catch (error) {
       const errorMessage = error.response?.data?.error || 'Erro ao fazer login';
       Alert.alert('Erro no Login', errorMessage);
@@ -46,32 +49,16 @@ export default function LoginScreen({ navigation }) {
       <Button title="Entrar" onPress={handleLogin} />
       <Button
         title="Não tem conta? Cadastre-se"
-        onPress={() => navigation.navigate('Register')} // Navega para a tela de Registro
+        onPress={() => navigation.navigate('Register')}
         color="#888"
       />
     </View>
   );
 }
 
-// Estilos básicos (você pode mover para src/styles)
+// Seus estilos
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 12,
-    paddingHorizontal: 10,
-    borderRadius: 5,
-  },
+  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  input: { height: 40, borderColor: 'gray', borderWidth: 1, marginBottom: 12, paddingHorizontal: 10, borderRadius: 5 },
 });

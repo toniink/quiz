@@ -1,6 +1,6 @@
 // quiz-backend/authMiddleware.js
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = 'sua-chave-secreta-muito-segura'; // A mesma chave!
+const SECRET_KEY = 'pipoca'; // A mesma chave!
 
 module.exports = function(req, res, next) {
   const authHeader = req.headers['authorization'];
