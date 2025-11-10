@@ -87,6 +87,9 @@ app.post('/login', (req, res) => {
 
 // Rota para buscar todos os Quizzes e Pastas do usuário
 // (Implementa "Agrupamento por Pastas")
+// quiz-backend/index.js
+
+// --- ROTA DE BUSCAR DASHBOARD (Corrigida para M:N) ---
 app.get('/dashboard', authMiddleware, (req, res) => {
   const userId = req.user.id; // Pegamos o ID do usuário (do token)
   let response = {
@@ -99,8 +102,17 @@ app.get('/dashboard', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     response.folders = folders;
 
-    // Busca quizzes que NÃO estão em pastas (folderId é NULL)
-    const quizQuery = "SELECT * FROM quizzes WHERE userId = ? AND folderId IS NULL";
+    // CORREÇÃO:
+    // Agora buscamos quizzes do usuário (userId)
+    // que NÃO ESTÃO EM (NOT IN) na tabela de junção 'quiz_folders'
+    const quizQuery = `
+      SELECT * FROM quizzes
+      WHERE userId = ? 
+      AND id NOT IN (
+        SELECT quizId FROM quiz_folders
+      )
+    `;
+
     db.all(quizQuery, [userId], (err, quizzes) => {
       if (err) return res.status(500).json({ error: err.message });
       response.quizzes = quizzes;
@@ -142,22 +154,30 @@ app.delete('/quizzes/:id', authMiddleware, (req, res) => {
   });
 });
 
-// ROTA PARA CRIAR UM NOVO QUIZ (Fluxo de Criação de Quiz)
+// ROTA PARA CRIAR UM NOVO QUIZ (MODIFICADA PARA M:N)
 app.post('/quizzes', authMiddleware, (req, res) => {
   const userId = req.user.id;
-  const { title, timePerQuestion, folderId, questions } = req.body;
+  const { title, timePerQuestion, folderIds, questions } = req.body;
 
   if (!title || !questions || questions.length === 0) {
     return res.status(400).json({ error: "Título e pelo menos uma pergunta são obrigatórios" });
   }
 
   db.serialize(() => {
-    const quizSql = `INSERT INTO quizzes (title, timePerQuestion, userId, folderId) VALUES (?, ?, ?, ?)`;
-    
-    db.run(quizSql, [title, timePerQuestion || 0, userId, folderId || null], function(err) {
+    // 1. Cria o Quiz (sem folderId)
+    const quizSql = `INSERT INTO quizzes (title, timePerQuestion, userId) VALUES (?, ?, ?)`;
+    db.run(quizSql, [title, timePerQuestion || 0, userId], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       
-      const quizId = this.lastID; 
+      const quizId = this.lastID;
+
+      // 2. Associa o Quiz às Pastas (na tabela de junção)
+      if (folderIds && folderIds.length > 0) {
+        const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
+        folderIds.forEach(folderId => {
+          db.run(assocSql, [quizId, folderId]);
+        });
+      }
 
       const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
       const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
@@ -222,31 +242,40 @@ app.get('/quizzes/:id', authMiddleware, (req, res) => {
 });
 
 
-// ROTA PARA ATUALIZAR UM QUIZ (Fluxo de Edição)
+// ROTA PARA ATUALIZAR UM QUIZ (MODIFICADA PARA M:N)
 app.put('/quizzes/:id', authMiddleware, (req, res) => {
   const quizId = req.params.id;
   const userId = req.user.id;
-  const { title, timePerQuestion, folderId, questions } = req.body;
+  const { title, timePerQuestion, folderIds, questions } = req.body;
 
-  // Para edição, a estratégia mais simples é "Nuke and Pave":
-  // 1. Deletar todas as perguntas/alternativas antigas
-  // 2. Atualizar os dados do quiz (título, etc.)
-  // 3. Recriar as perguntas/alternativas (mesma lógica do POST)
 
   db.serialize(() => {
     // 1. Atualiza o Quiz principal
     const updateSql = `UPDATE quizzes SET title = ?, timePerQuestion = ?, folderId = ? 
                        WHERE id = ? AND userId = ?`;
+                       
     db.run(updateSql, [title, timePerQuestion || 0, folderId || null, quizId, userId], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: "Quiz não encontrado ou não autorizado"});
     });
 
-    // 2. Deleta todas as perguntas antigas (ON DELETE CASCADE cuidará das alternativas)
+    // 2. Deleta TODAS as associações de pastas antigas
+    const deleteAssocSql = "DELETE FROM quiz_folders WHERE quizId = ?";
+    db.run(deleteAssocSql, [quizId]);
+
+    // 3. Re-cria as associações de pastas
+    if (folderIds && folderIds.length > 0) {
+      const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
+      folderIds.forEach(folderId => {
+        db.run(assocSql, [quizId, folderId]);
+      });
+    }
+
+    // 4. Deleta todas as perguntas antigas (ON DELETE CASCADE cuidará das alternativas)
     const deleteSql = "DELETE FROM questions WHERE quizId = ?";
     db.run(deleteSql, [quizId]);
 
-    // 3. Recria (mesma lógica do POST)
+    // 5. Recria (mesma lógica do POST)
     const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
     const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
 

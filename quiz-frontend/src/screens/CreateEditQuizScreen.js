@@ -1,6 +1,8 @@
 // src/screens/CreateEditQuizScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, Switch,  } from 'react-native';
+import { SafeAreaView} from 'react-native-safe-area-context';
+import { COLORS, SIZING, FONTS} from '../constants/theme';
 import { getQuizDetails, createQuiz, updateQuiz } from '../services/api';
 
 // Estado inicial para uma nova pergunta
@@ -131,56 +133,71 @@ export default function CreateEditQuizScreen({ route, navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.label}>Título do Quiz</Text>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} />
-
-      <Text style={styles.label}>Tempo por Pergunta (em segundos, 0 = sem tempo)</Text>
-      <TextInput style={styles.input} value={timePerQuestion} onChangeText={setTimePerQuestion} keyboardType="numeric" />
-
-      {questions.map((q, qIndex) => (
-        <View key={qIndex} style={styles.questionBox}>
-          <Text style={styles.label}>Pergunta {qIndex + 1}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Texto da pergunta"
-            value={q.questionText}
-            onChangeText={(text) => handleQuestionChange(text, qIndex)}
-          />
-          
-          <Text style={styles.label}>Alternativas:</Text>
-          {q.options.map((o, oIndex) => (
-            <View key={oIndex} style={styles.optionContainer}>
-              <TextInput
-                style={styles.optionInput}
-                placeholder={`Alternativa ${oIndex + 1}`}
-                value={o.optionText}
-                onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
-              />
-              {/* Teste "Seleção de Alternativa Correta" (Switch) */}
-              <Text>Correta?</Text>
-              <Switch
-                value={o.isCorrect}
-                onValueChange={() => handleSetCorrect(qIndex, oIndex)}
-              />
-            </View>
-          ))}
-          <Button title="Adicionar Alternativa" onPress={() => addOption(qIndex)} />
-        </View>
-      ))}
-
-      <Button title="Adicionar Pergunta" onPress={addQuestion} />
-
-      <Button
-        title={loading ? "Salvando..." : (isEditMode ? "Atualizar Quiz" : "Salvar Quiz")}
-        onPress={handleSave}
-        disabled={!isFormValid() || loading} // Teste "Estado do Botão"
-      />
-    </ScrollView>
+    <SafeAreaView styles={styles.safeArea}>
+      
+      <ScrollView style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      
+      >
+        <Text style={styles.label}>Título do Quiz</Text>
+        <TextInput style={styles.input} value={title} onChangeText={setTitle} />
+        <Text style={styles.label}>Tempo por Pergunta (em segundos, 0 = sem tempo)</Text>
+        <TextInput style={styles.input} value={timePerQuestion} onChangeText={setTimePerQuestion} keyboardType="numeric" />
+        {questions.map((q, qIndex) => (
+          <View key={qIndex} style={styles.questionBox}>
+            <Text style={styles.label}>Pergunta {qIndex + 1}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Texto da pergunta"
+              value={q.questionText}
+              onChangeText={(text) => handleQuestionChange(text, qIndex)}
+            />
+      
+            <Text style={styles.label}>Alternativas:</Text>
+            {q.options.map((o, oIndex) => (
+              <View key={oIndex} style={styles.optionContainer}>
+                <TextInput
+                  style={styles.optionInput}
+                  placeholder={`Alternativa ${oIndex + 1}`}
+                  value={o.optionText}
+                  onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
+                />
+                {/* Teste "Seleção de Alternativa Correta" (Switch) */}
+                <Text>Correta?</Text>
+                <Switch
+                  value={o.isCorrect}
+                  onValueChange={() => handleSetCorrect(qIndex, oIndex)}
+                />
+              </View>
+            ))}
+            <Button title="Adicionar Alternativa" onPress={() => addOption(qIndex)} />
+          </View>
+        ))}
+        <Button title="Adicionar Pergunta" onPress={addQuestion} />
+        <Button
+          title={loading ? "Salvando..." : (isEditMode ? "Atualizar Quiz" : "Salvar Quiz")}
+          onPress={handleSave}
+          disabled={!isFormValid() || loading} // Teste "Estado do Botão"
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1, 
+    backgroundColor: COLORS.lightGray, 
+  },
+  scrollView: {
+  },
+  scrollContent: {
+    padding: SIZING.padding, 
+  },
+  container: {
+    flex: 1,
+    padding: 10 
+  },
   container: { flex: 1, padding: 10 },
   label: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 8, borderRadius: 5, marginBottom: 10 },

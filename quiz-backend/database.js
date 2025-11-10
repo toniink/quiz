@@ -25,19 +25,17 @@ const db = new sqlite3.Database('./quiz.db', (err) => {
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
     )`);
 
-    // Tabela de Quizzes (Nova)
-    // ('userId' é o dono, 'folderId' é onde está guardado, pode ser NULL)
+// Tabela de Quizzes (MODIFICADA)
+    // 'folderId' foi REMOVIDO daqui
     db.run(`CREATE TABLE IF NOT EXISTS quizzes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
-      timePerQuestion INTEGER DEFAULT 0, -- Em segundos. 0 = sem tempo
+      timePerQuestion INTEGER DEFAULT 0,
       userId INTEGER NOT NULL,
-      folderId INTEGER,
-      FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE,
-      FOREIGN KEY (folderId) REFERENCES folders (id) ON DELETE SET NULL
+      FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
     )`);
 
-    // Tabela de Perguntas (Nova)
+    // Tabela de Perguntas (SEM MUDANÇA)
     db.run(`CREATE TABLE IF NOT EXISTS questions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       questionText TEXT NOT NULL,
@@ -45,7 +43,7 @@ const db = new sqlite3.Database('./quiz.db', (err) => {
       FOREIGN KEY (quizId) REFERENCES quizzes (id) ON DELETE CASCADE
     )`);
 
-    // Tabela de Alternativas (Nova)
+    // Tabela de Alternativas (SEM MUDANÇA)
     // 'isCorrect' = 1 (true) ou 0 (false)
     db.run(`CREATE TABLE IF NOT EXISTS options (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,6 +52,18 @@ const db = new sqlite3.Database('./quiz.db', (err) => {
       questionId INTEGER NOT NULL,
       FOREIGN KEY (questionId) REFERENCES questions (id) ON DELETE CASCADE
     )`);
+
+    // Tabela de Junção (NOVA)
+    // Conecta Quizzes e Pastas
+    db.run(`CREATE TABLE IF NOT EXISTS quiz_folders (
+      quizId INTEGER NOT NULL,
+      folderId INTEGER NOT NULL,
+      PRIMARY KEY (quizId, folderId),
+      FOREIGN KEY (quizId) REFERENCES quizzes (id) ON DELETE CASCADE,
+      FOREIGN KEY (folderId) REFERENCES folders (id) ON DELETE CASCADE
+    )`);
+
+    
   });
 });
 
