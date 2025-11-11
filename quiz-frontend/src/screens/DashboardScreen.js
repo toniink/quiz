@@ -1,9 +1,9 @@
 // src/screens/DashboardScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Platform, ScrollView, Alert, TouchableOpacity} from 'react-native';
 import { SafeAreaView} from 'react-native-safe-area-context';
 import { useAuth} from '../context/AuthContext';
-import { getDashboardData, deleteQuiz } from '../services/api';
+import { getDashboardData, deleteQuiz, createFolder } from '../services/api';
 import theme, { COLORS, SIZING, FONTS } from '../constants/theme';
 import StyledButton from '../components/StyledButton';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -23,6 +23,8 @@ export default function DashboardScreen({ navigation }) {
   const [modalVisible, setModalVIsible] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState(null);
 
+  const [folderModalVisible, setFolderModalVisible] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -75,6 +77,62 @@ export default function DashboardScreen({ navigation }) {
       }
     };
 
+    const handleCreateFolder = () => {
+    // Alert.prompt NÃO funciona bem no Android/Web.
+    // Vamos usar um prompt simples por enquanto, mas o ideal é um modal.
+    // Esta é uma limitação do React Native.
+    const name = prompt('Digite o nome da nova pasta:'); 
+    
+    if (name) {
+      createFolder(name)
+        .then(() => {
+          Alert.alert("Sucesso", `Pasta "${name}" criada.`);
+          fetchData(); // Recarrega o dashboard
+        })
+        .catch(() => Alert.alert("Erro", "Não foi possível criar a pasta."));
+    }
+  };
+
+  const openFolderDeleteModal = (folder) => {
+    setFolderToDelete(folder);
+    setFolderModalVisible(true);
+  };
+
+  const closeFolderDeleteModal = () => {
+    setFolderModalVisible(false);
+    setFolderToDelete(null);
+  };
+
+  const handleFolderDeleteConfirm = async () => {
+    if (!folderToDelete) return;
+    try {
+      await deleteFolder(folderToDelete.id); // Chama a nova API
+      Alert.alert("Sucesso!", `Pasta "${folderToDelete.name}" deletada.`);
+      closeFolderDeleteModal();
+      fetchData(); // Recarrega o dashboard
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível deletar a pasta.");
+      closeFolderDeleteModal();
+    }
+  };
+
+    // 3. RENDERIZA UMA PASTA CLICÁVEL
+  const renderFolderItem = ({ item }) => (
+    <View style={styles.card}>
+      <TouchableOpacity onPress={() => navigation.navigate('Folder', { folderId: item.id })}>
+        <Text style={styles.cardTitle}>{item.name}</Text>
+      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <StyledButton 
+          title="Deletar" 
+          color="danger" 
+          onPress={() => openFolderDeleteModal(item)} 
+        />
+        {/* Você pode adicionar "Renomear" aqui no futuro */}
+      </View>
+    </View>
+  );
+
   const renderQuizItem = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{item.title}</Text>
@@ -109,6 +167,19 @@ export default function DashboardScreen({ navigation }) {
         title="Criar Novo Quiz"
         onPress={() => navigation.navigate('CreateEditQuiz')}
       />
+
+      <StyledButton 
+        title="Criar Nova Pasta"
+        color="secondary"
+        onPress={handleCreateFolder}
+      />
+      
+      <Text style={styles.sectionTitle}>Pastas</Text>
+      <FlatList 
+        data={data.folders}
+        renderItem={renderFolderItem} // 5. Use o novo renderFolderItem
+        keyExtractor={(item) => item.id.toString()}
+      />
       
       <Text style={styles.sectionTitle}>Pastas</Text>
       <FlatList 
@@ -135,6 +206,21 @@ export default function DashboardScreen({ navigation }) {
           message={`Tem certeza que deseja deletar o quiz "${quizToDelete.title}"? Esta ação não pode ser desfeita.`}
           onCancel={closeDeleteModal}
           onConfirm={handleDeleteConfirm}
+          confirmText="Deletar"
+          confirmColor="danger"
+        />
+      )}
+
+      {/* NOVO MODAL PARA DELETAR PASTAS */}
+      {folderToDelete && (
+        <ConfirmationModal
+          visible={folderModalVisible}
+          title="Confirmar Deleção de Pasta"
+          message={`Tem certeza que deseja deletar a pasta "${folderToDelete.name}"? 
+
+Os quizzes DENTRO dela NÃO serão apagados. Eles apenas deixarão de pertencer a esta pasta.`}
+          onCancel={closeFolderDeleteModal}
+          onConfirm={handleFolderDeleteConfirm}
           confirmText="Deletar"
           confirmColor="danger"
         />

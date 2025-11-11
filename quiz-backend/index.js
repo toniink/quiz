@@ -235,6 +235,18 @@ app.get('/quizzes/:id', authMiddleware, (req, res) => {
       // (Teste Unitário: shuffleArray) Você pode embaralhar as 'fullQuestions' aqui
       // quiz.questions = shuffleArray(fullQuestions);
       quiz.questions = fullQuestions; 
+
+      // 3. Busca os IDs das pastas associadas
+      const folderIdsSql = "SELECT folderId FROM quiz_folders WHERE quizId = ?";
+      db.all(folderIdsSql, [quizId], (err, folderLinks) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // Mapeia de [{folderId: 1}, {folderId: 3}] para [1, 3]
+        quiz.folderIds = folderLinks.map(f => f.folderId);
+        
+        // Envia o objeto completo do quiz
+        res.json(quiz); 
+      });
       
       res.json(quiz);
     });
@@ -290,6 +302,81 @@ app.put('/quizzes/:id', authMiddleware, (req, res) => {
     });
 
     res.status(200).json({ message: "Quiz atualizado com sucesso!" });
+  });
+
+
+  
+
+
+
+
+});
+
+app.post('/folders', authMiddleware, (req, res) => {
+  const { name } = req.body;
+  const userId = req.user.id;
+  if (!name) {
+    return res.status(400).json({ error: 'O nome da pasta é obrigatório' });
+  }
+  const sql = 'INSERT INTO folders (name, userId) VALUES (?, ?)';
+  db.run(sql, [name, userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    // Retorna a nova pasta criada
+    res.status(201).json({ id: this.lastID, name: name, userId: userId });
+  });
+});
+
+// ROTA PARA BUSCAR UMA PASTA E SEUS QUIZZES (O "Agrupamento")
+app.get('/folders/:id', authMiddleware, (req, res) => {
+  const folderId = req.params.id;
+  const userId = req.user.id;
+  let response = { folder: null, quizzes: [] };
+
+  // 1. Pega os detalhes da pasta (e verifica se pertence ao usuário)
+  const folderSql = "SELECT * FROM folders WHERE id = ? AND userId = ?";
+  db.get(folderSql, [folderId, userId], (err, folder) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!folder) return res.status(404).json({ error: 'Pasta não encontrada' });
+    response.folder = folder;
+
+    // 2. Pega todos os quizzes associados a essa pasta (usando a tabela de junção)
+    const quizzesSql = `
+      SELECT q.* FROM quizzes q
+      JOIN quiz_folders qf ON q.id = qf.quizId
+      WHERE qf.folderId = ? AND q.userId = ?
+    `;
+    db.all(quizzesSql, [folderId, userId], (err, quizzes) => {
+      if (err) return res.status(500).json({ error: err.message });
+      response.quizzes = quizzes;
+      res.json(response); // Retorna a pasta e seus quizzes
+    });
+  });
+});
+
+// ROTA PARA DELETAR UMA PASTA
+app.delete('/folders/:id', authMiddleware, (req, res) => {
+  const folderId = req.params.id;
+  const userId = req.user.id;
+
+  // Deleta a pasta APENAS se ela pertencer ao usuário
+  const sql = "DELETE FROM folders WHERE id = ? AND userId = ?";
+  db.run(sql, [folderId, userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) {
+      return res.status(404).json({ error: "Pasta não encontrada ou não autorizada" });
+    }
+    // O 'ON DELETE CASCADE' na tabela 'quiz_folders' limpará as associações
+    res.status(200).json({ message: 'Pasta deletada com sucesso' });
+  });
+});
+
+// ROTA PARA BUSCAR TODAS AS PASTAS DO USUÁRIO (para o formulário)
+app.get('/folders', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const sql = "SELECT * FROM folders WHERE userId = ?";
+  db.all(sql, [userId], (err, folders) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(folders);
   });
 });
 

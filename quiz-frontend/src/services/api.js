@@ -45,3 +45,10 @@ export const deleteQuiz = (id) => api.delete(`/quizzes/${id}`);
 export const getQuizDetails = (id) => api.get(`/quizzes/${id}`);
 export const createQuiz = (quizData) => api.post('/quizzes', quizData); // Esta é a que estava dando 404
 export const updateQuiz = (id, quizData) => api.put(`/quizzes/${id}`, quizData);
+
+//funcoes de pastas
+export const createFolder = (name) => api.post('/folders', { name });
+export const getFolderDetails = (id) => api.get(`/folders/${id}`);
+export const deleteFolder = (id) => api.delete(`/folders/${id}`);
+export const getAllFolders = () => api.get('/folders');
+

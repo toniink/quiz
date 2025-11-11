@@ -11,6 +11,7 @@ import DashboardScreen from '../screens/DashboardScreen'; // Tela principal pós
 import CreateEditQuizScreen from '../screens/CreateEditQuizScreen'; // Formulário
 import PlayQuizScreen from '../screens/PlayQuizScreen'; // O jogo
 import ResultsScreen from '../screens/ResultsScreen'; // Placar final
+import FolderScreen from '../screens/FolderScreen';
 
 const Stack = createStackNavigator();
 
@@ -44,6 +45,11 @@ function MainStack() {
         name="Dashboard" 
         component={DashboardScreen} 
         options={{ title: 'Meus Quizzes' }} 
+      />
+      <Stack.Screen 
+        name="Folder" 
+        component={FolderScreen} 
+        // O título será definido dinamicamente pela tela
       />
       <Stack.Screen 
         name="CreateEditQuiz" 
