@@ -130,6 +130,7 @@ export default function PlayQuizScreen({ route, navigation }) {
       
       {currentQuestion.options.map(option => (
         <TouchableOpacity
+          testID={`option-${index}`}
           key={option.id}
           style={getOptionStyle(option)}
           onPress={() => handleSelectOption(option)}

@@ -32,6 +32,7 @@ export default function LoginScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>
       <TextInput
+        testID="input-email"
         style={styles.input}
         placeholder="E-mail"
         value={email}
@@ -40,13 +41,16 @@ export default function LoginScreen({ navigation }) {
         autoCapitalize="none"
       />
       <TextInput
+        testID="input-password"
         style={styles.input}
         placeholder="Senha"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Entrar" onPress={handleLogin} />
+      <View testID="btn-login"> 
+         <Button title="Entrar" onPress={handleLogin} />
+      </View>
       <Button
         title="Não tem conta? Cadastre-se"
         onPress={() => navigation.navigate('Register')}

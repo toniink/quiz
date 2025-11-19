@@ -7,11 +7,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest" 
+    "test": "jest"
   },
   "jest": {
     "preset": "jest-expo"
-    
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -30,7 +29,9 @@
   },
   "private": true,
   "devDependencies": {
+    "chromedriver": "^142.0.3",
     "jest": "^29.7.0",
-    "jest-expo": "^54.0.13"
+    "jest-expo": "^54.0.13",
+    "selenium-webdriver": "^4.38.0"
   }
 }

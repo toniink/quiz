@@ -1,10 +1,11 @@
-// src/screens/CreateEditQuizScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert, Switch, Platform } from 'react-native';
+import { 
+  View, Text, TextInput, Button, StyleSheet, 
+  ScrollView, Alert, Switch, Platform, TouchableOpacity, ActivityIndicator 
+} from 'react-native';
 import { COLORS, SIZING, FONTS} from '../constants/theme';
 import { getQuizDetails, createQuiz, updateQuiz, getAllFolders } from '../services/api';
 
-// Estado inicial para uma nova pergunta
 const newQuestionTemplate = () => ({
   questionText: '',
   options: [
@@ -14,7 +15,6 @@ const newQuestionTemplate = () => ({
 });
 
 export default function CreateEditQuizScreen({ route, navigation }) {
-  // Pega o ID da rota. Se existir, estamos editando.
   const { quizId } = route.params || {};
   const isEditMode = !!quizId;
 
@@ -22,22 +22,14 @@ export default function CreateEditQuizScreen({ route, navigation }) {
   const [timePerQuestion, setTimePerQuestion] = useState('0');
   const [questions, setQuestions] = useState([newQuestionTemplate()]);
   const [loading, setLoading] = useState(false);
-
   const [allFolders, setAllFolders] = useState([]);
   const [selectedFolderIds, setSelectedFolderIds] = useState([]);
 
-  // Teste de Componente: "Preenchimento para Edição"
-useEffect(() => {
-    // 1. Busca TODAS as pastas do usuário para exibir a lista
+  useEffect(() => {
     getAllFolders()
-      .then(response => {
-        setAllFolders(response.data);
-      })
-      .catch(err => {
-        console.error("Não foi possível carregar a lista de pastas", err);
-      });
+      .then(response => setAllFolders(response.data))
+      .catch(err => console.error("Erro pastas", err));
 
-    // 2. Se estiver editando, carrega os dados do quiz
     if (isEditMode) {
       setLoading(true);
       getQuizDetails(quizId)
@@ -45,18 +37,16 @@ useEffect(() => {
           const quiz = response.data;
           setTitle(quiz.title);
           setTimePerQuestion(quiz.timePerQuestion.toString());
-          // ... (lógica de formattedQuestions) ...
-          setQuestions(formattedQuestions);
-          
-          // NOVA LÓGICA: Define as pastas que já estão selecionadas
+          setQuestions(quiz.questions.map(q => ({
+            ...q,
+            options: q.options.map(o => ({ ...o, isCorrect: !!o.isCorrect }))
+          })));
           setSelectedFolderIds(quiz.folderIds || []); 
         })
-        .catch(err => Alert.alert("Erro", "Não foi possível carregar o quiz."))
+        .catch(err => Alert.alert("Erro", "Não foi possível carregar."))
         .finally(() => setLoading(false));
     }
-  }, [quizId, isEditMode]); // Adicione isEditMode ao array de dependência
-
-  // --- Funções de Manipulação do Formulário ---
+  }, [quizId, isEditMode]);
 
   const handleQuestionChange = (text, qIndex) => {
     const newQuestions = [...questions];
@@ -70,10 +60,8 @@ useEffect(() => {
     setQuestions(newQuestions);
   };
 
-  // Teste de Componente: "Seleção de Alternativa Correta" (Radio Button)
   const handleSetCorrect = (qIndex, oIndex) => {
     const newQuestions = [...questions];
-    // Zera todos os outros...
     newQuestions[qIndex].options.forEach((opt, index) => {
       opt.isCorrect = (index === oIndex);
     });
@@ -90,30 +78,20 @@ useEffect(() => {
     setQuestions(newQuestions);
   };
 
-// NOVA FUNÇÃO: Adiciona ou remove um ID da lista de selecionados
   const toggleFolderSelection = (folderId) => {
     setSelectedFolderIds(prevIds => {
-      if (prevIds.includes(folderId)) {
-        // Se já está, remove
-        return prevIds.filter(id => id !== folderId);
-      } else {
-        // Se não está, adiciona
-        return [...prevIds, folderId];
-      }
+      if (prevIds.includes(folderId)) return prevIds.filter(id => id !== folderId);
+      return [...prevIds, folderId];
     });
   };
 
-  // --- Validação e Salvamento ---
-
-  // Teste de Componente: "Validação" e "Estado do Botão"
   const isFormValid = () => {
     if (!title.trim()) return false;
     if (questions.length === 0) return false;
-
     for (const q of questions) {
       if (!q.questionText.trim()) return false;
       if (q.options.length < 2) return false;
-      if (!q.options.some(o => o.isCorrect)) return false; // Pelo menos uma correta
+      if (!q.options.some(o => o.isCorrect)) return false;
       for (const o of q.options) {
         if (!o.optionText.trim()) return false;
       }
@@ -123,7 +101,7 @@ useEffect(() => {
 
   const handleSave = async () => {
     if (!isFormValid()) {
-      Alert.alert("Formulário Inválido", "Verifique todos os campos. Cada pergunta deve ter um texto, pelo menos 2 alternativas (com texto) e 1 alternativa correta marcada.");
+      Alert.alert("Inválido", "Preencha todos os campos e marque as respostas corretas.");
       return;
     }
     
@@ -136,59 +114,62 @@ useEffect(() => {
         options: q.options.map(o => ({ ...o, isCorrect: o.isCorrect ? 1 : 0 })),
         folderIds: selectedFolderIds
       }))
-      
     };
 
     try {
       if (isEditMode) {
-        await updateQuiz(quizId, quizData); // Teste E2E: Edição
+        await updateQuiz(quizId, quizData);
       } else {
-        await createQuiz(quizData); // Teste E2E: Criação
+        await createQuiz(quizData);
       }
-      Alert.alert("Sucesso!", `Quiz ${isEditMode ? 'atualizado' : 'criado'} com sucesso.`);
-      navigation.goBack(); // Volta pro Dashboard
+      Alert.alert("Sucesso!", "Quiz salvo com sucesso.");
+      navigation.goBack(); 
     } catch (error) {
-      Alert.alert("Erro ao Salvar", error.response?.data?.error || "Tente novamente.");
+      Alert.alert("Erro", "Falha ao salvar.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading && isEditMode) {
-    return <View><Text>Carregando Quiz...</Text></View>;
-  }
+  if (loading && isEditMode) return <View><Text>Carregando...</Text></View>;
 
   return (
     <View style={styles.safeArea}>
-      
-      <ScrollView style={styles.scrollView}
+      <ScrollView 
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
-      
       >
         <Text style={styles.label}>Título do Quiz</Text>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle} />
-        <Text style={styles.label}>Tempo por Pergunta (em segundos, 0 = sem tempo)</Text>
-        <TextInput style={styles.input} value={timePerQuestion} onChangeText={setTimePerQuestion} keyboardType="numeric" />
+        {/* CORREÇÃO 1: testID no lugar certo */}
+        <TextInput 
+          testID="quiz-title" 
+          style={styles.input} 
+          value={title} 
+          onChangeText={setTitle} 
+        />
+
+        <Text style={styles.label}>Tempo por Pergunta (s)</Text>
+        {/* CORREÇÃO 2: testID único */}
+        <TextInput  
+          testID="quiz-time" 
+          style={styles.input} 
+          value={timePerQuestion} 
+          onChangeText={setTimePerQuestion} 
+          keyboardType="numeric" 
+        />
+
         <Text style={styles.label}>Adicionar às Pastas:</Text>
         <View style={styles.folderContainer}>
-          {loading ? (
-            <Text>Carregando pastas...</Text>
-          ) : allFolders.length === 0 ? (
-            <Text style={styles.emptyText}>Você ainda não criou nenhuma pasta.</Text>
-          ) : (
-            allFolders.map(folder => (
+          {allFolders.map(folder => (
               <View key={folder.id} style={styles.optionContainer}>
                 <Text style={{flex: 1, ...FONTS.body}}>{folder.name}</Text>
                 <Switch
-                  trackColor={{ false: COLORS.border, true: COLORS.primary }}
-                  thumbColor={COLORS.white}
                   value={selectedFolderIds.includes(folder.id)}
                   onValueChange={() => toggleFolderSelection(folder.id)}
                 />
               </View>
-            ))
-          )}
+          ))}
         </View>
 
         {questions.map((q, qIndex) => (
@@ -210,7 +191,6 @@ useEffect(() => {
                   value={o.optionText}
                   onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
                 />
-                {/* Teste "Seleção de Alternativa Correta" (Switch) */}
                 <Text>Correta?</Text>
                 <Switch
                   value={o.isCorrect}
@@ -221,12 +201,22 @@ useEffect(() => {
             <Button title="Adicionar Alternativa" onPress={() => addOption(qIndex)} />
           </View>
         ))}
-        <Button title="Adicionar Pergunta" onPress={addQuestion} />
-        <Button
-          title={loading ? "Salvando..." : (isEditMode ? "Atualizar Quiz" : "Salvar Quiz")}
+        
+        <View style={{marginBottom: 10}}>
+           <Button title="Adicionar Pergunta" onPress={addQuestion} />
+        </View>
+
+        {/* CORREÇÃO 3: Botão Salvar virou TouchableOpacity para o Selenium achar pelo texto */}
+        <TouchableOpacity
           onPress={handleSave}
-          disabled={!isFormValid() || loading} // Teste "Estado do Botão"
-        />
+          style={[styles.saveButton, (!isFormValid() || loading) && styles.disabledButton]}
+          disabled={!isFormValid() || loading}
+        >
+           <Text style={styles.saveButtonText}>
+             {loading ? "Salvando..." : "Salvar Quiz"}
+           </Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -236,22 +226,14 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.lightGray,
-  },
-  scrollView: {
-    flex:1,
+    // Correção do Scroll no Web
     ...Platform.select({
-    web: {
-      maxHeight: '100vh'
-    }
-  })
+      web: { height: '100vh' }
+    })
   },
   scrollContent: {
     padding: SIZING.padding, 
-    paddingBottom: 90,
-  },
-  container: {
-    flex: 1,
-    padding: 10
+    paddingBottom: 100,
   },
   label: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 8, borderRadius: 5, marginBottom: 10 },
@@ -259,17 +241,29 @@ const styles = StyleSheet.create({
   optionContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 5 },
   optionInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 5, marginRight: 10 },
   folderContainer: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.border,
+    backgroundColor: 'white',
+    borderColor: '#ccc',
     borderWidth: 1,
-    borderRadius: SIZING.radius,
-    padding: SIZING.padding / 2,
-    marginBottom: SIZING.margin,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
   },
-  emptyText: {
-    ...FONTS.body,
-    color: COLORS.secondary,
-    textAlign: 'center',
-    padding: SIZING.padding,
+  // Estilos do Botão Salvar
+  saveButton: {
+    backgroundColor: COLORS.primary || '#007bff',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 20,
+    cursor: 'pointer'
   },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed'
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16
+  }
 });

@@ -17,6 +17,7 @@ app.use(express.json()); // Permite ao Express entender JSON
 
 // --- ROTA DE CADASTRO ---
 app.post('/register', async (req, res) => {
+  console.log('--> RECEBI UM PEDIDO DE REGISTRO:', req.body.email);
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
@@ -384,6 +385,10 @@ app.get('/folders', authMiddleware, (req, res) => {
 
 
 // Inicia o servidor
-app.listen(PORT, () => {
-  console.log(`Servidor backend rodando em http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Servidor backend rodando em http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app; // Exporta o app para o Jest testar

@@ -1,6 +1,6 @@
 // src/screens/RegisterScreen.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { registerUser } from '../services/api';
 
 export default function RegisterScreen({ navigation }) {
@@ -27,12 +27,14 @@ export default function RegisterScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Cadastro</Text>
       <TextInput
+        testID="reg-username"
         style={styles.input}
         placeholder="Nome de Usuário"
         value={username}
         onChangeText={setUsername}
       />
       <TextInput
+       testID="reg-email"
         style={styles.input}
         placeholder="E-mail"
         value={email}
@@ -41,13 +43,20 @@ export default function RegisterScreen({ navigation }) {
         autoCapitalize="none"
       />
       <TextInput
+        testID="reg-password"
         style={styles.input}
         placeholder="Senha"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Cadastrar" onPress={handleRegister} />
+      <TouchableOpacity
+      testID="btn-submit-register"
+      onPress={handleRegister}
+      style={styles.customButton}
+    >
+      <Text style={styles.customButtonText}>CADASTRAR</Text>
+    </TouchableOpacity>
       <Button
         title="Já tenho conta (Login)"
         onPress={() => navigation.goBack()}
@@ -62,4 +71,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   input: { height: 40, borderColor: 'gray', borderWidth: 1, marginBottom: 12, paddingHorizontal: 10, borderRadius: 5 },
+  customButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+    cursor: 'pointer' // Ajuda no web
+  },
+  customButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16
+  }
 });
