@@ -1,8 +1,8 @@
-// src/services/api.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// !! Lembre-se de trocar localhost pelo IP da sua máquina se usar o celular
+// ⚠️ IMPORTANTE: Se estiver a testar no telemóvel (físico ou emulador Android),
+// substitua 'localhost' pelo IP da sua máquina (ex: 'http://192.168.1.15:4000')
 const API_URL = 'http://localhost:4000'; 
 
 const api = axios.create({
@@ -10,8 +10,8 @@ const api = axios.create({
 });
 
 // ===================================================================
-// INTERCEPTOR DE AUTENTICAÇÃO (A PARTE QUE FALTAVA)
-// Isso é executado ANTES de CADA requisição
+// INTERCEPTOR DE AUTENTICAÇÃO
+// Garante que o token seja enviado em todas as requisições
 // ===================================================================
 api.interceptors.request.use(
   async (config) => {
@@ -29,26 +29,32 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-// ===================================================================
 
 export default api;
 
-// Funções de Autenticação
+// =====================================================
+// 1. FUNÇÕES DE AUTENTICAÇÃO
+// =====================================================
 export const registerUser = (userData) => api.post('/register', userData);
 export const loginUser = (credentials) => api.post('/login', credentials);
 
-// Funções do Dashboard
+// =====================================================
+// 2. FUNÇÕES DO DASHBOARD E PASTAS
+// =====================================================
 export const getDashboardData = () => api.get('/dashboard');
-export const deleteQuiz = (id) => api.delete(`/quizzes/${id}`);
-
-// Funções de CRUD de Quiz
-export const getQuizDetails = (id) => api.get(`/quizzes/${id}`);
-export const createQuiz = (quizData) => api.post('/quizzes', quizData); // Esta é a que estava dando 404
-export const updateQuiz = (id, quizData) => api.put(`/quizzes/${id}`, quizData);
-
-//funcoes de pastas
 export const createFolder = (name) => api.post('/folders', { name });
-export const getFolderDetails = (id) => api.get(`/folders/${id}`);
 export const deleteFolder = (id) => api.delete(`/folders/${id}`);
+export const getFolderDetails = (id) => api.get(`/folders/${id}`);
 export const getAllFolders = () => api.get('/folders');
 
+// [NOVA FUNÇÃO] Remove múltiplos quizzes de uma pasta (sem apagar os quizzes do sistema)
+export const removeQuizzesFromFolder = (folderId, quizIds) => 
+  api.post(`/folders/${folderId}/remove_quizzes`, { quizIds });
+
+// =====================================================
+// 3. FUNÇÕES DE CRUD DE QUIZ
+// =====================================================
+export const getQuizDetails = (id) => api.get(`/quizzes/${id}`);
+export const createQuiz = (quizData) => api.post('/quizzes', quizData);
+export const updateQuiz = (id, quizData) => api.put(`/quizzes/${id}`, quizData);
+export const deleteQuiz = (id) => api.delete(`/quizzes/${id}`);

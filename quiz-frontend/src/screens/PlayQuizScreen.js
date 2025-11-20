@@ -1,29 +1,33 @@
-// src/screens/PlayQuizScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Button, ActivityIndicator, TouchableOpacity, Alert, ScrollView, Platform } from 'react-native';
 import { getQuizDetails } from '../services/api';
-// Importa as funções puras de lógica (do plano de testes)
-import { checkAnswer, shuffleArray } from '../utils/quizLogic'; // (Você precisa criar esse arquivo)
+import { checkAnswer, shuffleArray } from '../utils/quizLogic';
+import { COLORS, SIZING, FONTS } from '../constants/theme';
 
 export default function PlayQuizScreen({ route, navigation }) {
-  const { quizId } = route.params;
+  // Aceita um ID único (modo antigo) OU uma lista de IDs (modo "Jogar Todos")
+  // Também aceita score acumulado de quizzes anteriores
+  const { quizId, quizIds, currentIndex = 0, accumulatedScore = 0, accumulatedTotal = 0 } = route.params;
+
+  // Determina qual é o ID atual a ser jogado
+  const activeQuizId = quizIds ? quizIds[currentIndex] : quizId;
 
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [score, setScore] = useState(0); // Teste "Contador de Acertos"
-  const [selectedOption, setSelectedOption] = useState(null); // { id, isCorrect }
+  const [score, setScore] = useState(0); 
+  const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswerConfirmed, setIsAnswerConfirmed] = useState(false);
-  
-  // Teste "Timer"
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
     const loadQuiz = async () => {
       try {
-        const response = await getQuizDetails(quizId);
+        setLoading(true);
+        const response = await getQuizDetails(activeQuizId);
         const loadedQuiz = response.data;
-        // Embaralha as perguntas e opções ao carregar (Teste "Randomização")
+        
+        // Randomização
         loadedQuiz.questions = shuffleArray(loadedQuiz.questions.map(q => ({
           ...q,
           options: shuffleArray(q.options)
@@ -39,29 +43,23 @@ export default function PlayQuizScreen({ route, navigation }) {
       }
     };
     loadQuiz();
-  }, [quizId]);
+  }, [activeQuizId]);
 
-  // Efeito para o Timer (Teste "Tempo para Resposta")
+  // Timer Logic
   useEffect(() => {
-    if (!quiz || quiz.timePerQuestion === 0 || isAnswerConfirmed) {
-      return; // Não inicia o timer
-    }
+    if (!quiz || quiz.timePerQuestion === 0 || isAnswerConfirmed) return;
     
     if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer(t => t - 1);
-      }, 1000);
+      const interval = setInterval(() => setTimer(t => t - 1), 1000);
       return () => clearInterval(interval);
     } else {
-      // Tempo Esgotado
       handleConfirmAnswer();
     }
   }, [timer, quiz, isAnswerConfirmed]);
 
-
-  const handleSelectOption = (option) => {
+  const handleSelectOption = (optionId) => {
     if (isAnswerConfirmed) return; 
-    setSelectedOption(option.id); // Salva o ID
+    setSelectedOption(optionId);
   };
 
   const handleConfirmAnswer = () => {
@@ -69,122 +67,151 @@ export default function PlayQuizScreen({ route, navigation }) {
     setIsAnswerConfirmed(true);
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
-
-    // Alinhado com o Teste Unitário
+    // checkAnswer espera o objeto da pergunta e o ID da opção selecionada
     const isCorrect = checkAnswer(currentQuestion, selectedOption); 
-
+    
     if (isCorrect) {
-        setScore(s => s + 1);
+      setScore(s => s + 1);
     }
   };
 
   const handleNextQuestion = () => {
-    setIsAnswerConfirmed(false);
-    setSelectedOption(null);
-    
     const nextIndex = currentQuestionIndex + 1;
+    
     if (nextIndex < quiz.questions.length) {
+      // Próxima pergunta do MESMO quiz
+      setIsAnswerConfirmed(false);
+      setSelectedOption(null);
       setCurrentQuestionIndex(nextIndex);
-      setTimer(quiz.timePerQuestion || 0); // Reseta o timer
+      setTimer(quiz.timePerQuestion || 0);
     } else {
-      // Fim do Quiz (Teste E2E: "Placar final")
-      navigation.replace('Results', { 
-        score: score, 
-        total: quiz.questions.length 
-      });
+      // --- FIM DESTE QUIZ ---
+      finishCurrentQuiz();
     }
   };
 
-  // --- Funções de Renderização ---
+  const finishCurrentQuiz = () => {
+    const currentQuizScore = score;
+    const currentQuizTotal = quiz.questions.length;
+
+    // Se estivermos no modo "Jogar Todos" (quizIds existe)
+    if (quizIds && currentIndex < quizIds.length - 1) {
+        // Ainda tem quizzes na fila!
+        // Navega para a MESMA tela, mas com o próximo índice e score acumulado
+        navigation.replace('PlayQuiz', {
+            quizIds: quizIds,
+            currentIndex: currentIndex + 1,
+            accumulatedScore: accumulatedScore + currentQuizScore,
+            accumulatedTotal: accumulatedTotal + currentQuizTotal
+        });
+    } else {
+        // Acabou tudo (ou era só um quiz). Vai para Resultados.
+        navigation.replace('Results', { 
+            score: accumulatedScore + currentQuizScore, 
+            total: accumulatedTotal + currentQuizTotal 
+        });
+    }
+  };
+
+  // --- RENDERIZAÇÃO ---
 
   const getOptionStyle = (option) => {
     const { id, isCorrect } = option;
     if (!isAnswerConfirmed) {
-      // Compara o ID da opção com o ID salvo no estado
       return selectedOption === id ? styles.optionSelected : styles.option;
     }
-  
-    if (isCorrect) {
-      return [styles.option, styles.optionCorrect]; 
-    }
-    // Compara o ID da opção com o ID salvo no estado
-    if (selectedOption === id && !isCorrect) {
-      return [styles.option, styles.optionIncorrect]; 
-    }
+    if (isCorrect) return [styles.option, styles.optionCorrect];
+    if (selectedOption === id && !isCorrect) return [styles.option, styles.optionIncorrect];
     return styles.option;
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" />;
+    return (
+        <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={{marginTop: 10}}>Carregando Quiz...</Text>
+        </View>
+    );
   }
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
+  // Calcula progresso geral se estiver em playlist
+  const headerText = quizIds 
+    ? `Quiz ${currentIndex + 1} de ${quizIds.length}: ${quiz.title}`
+    : quiz.title;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.timerText}>
-        {quiz.timePerQuestion > 0 ? `Tempo: ${timer}s` : ''}
-      </Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.quizTitle}>{headerText}</Text>
+      
+      <View style={styles.infoRow}>
+         <Text style={styles.questionCount}>
+            Pergunta {currentQuestionIndex + 1}/{quiz.questions.length}
+         </Text>
+         <Text style={styles.timerText}>
+            {quiz.timePerQuestion > 0 ? `⏱️ ${timer}s` : ''}
+         </Text>
+      </View>
       
       <Text style={styles.questionText}>{currentQuestion.questionText}</Text>
       
       {currentQuestion.options.map(option => (
         <TouchableOpacity
-          testID={`option-${index}`}
           key={option.id}
           style={getOptionStyle(option)}
-          onPress={() => handleSelectOption(option)}
+          onPress={() => handleSelectOption(option.id)}
           disabled={isAnswerConfirmed}
         >
-          <Text>{option.optionText}</Text>
+          <Text style={styles.optionText}>{option.optionText}</Text>
         </TouchableOpacity>
       ))}
       
-      {isAnswerConfirmed ? (
-        <Button title="Próxima Pergunta" onPress={handleNextQuestion} />
-      ) : (
-        <Button 
-          title="Confirmar Resposta" 
-          onPress={handleConfirmAnswer}
-          disabled={!selectedOption} // Só pode confirmar se selecionou algo
-        />
-      )}
-      
-      <Text style={styles.scoreText}>Pontuação: {score}</Text>
-    </View>
+      <View style={styles.footer}>
+        {isAnswerConfirmed ? (
+            <TouchableOpacity style={styles.button} onPress={handleNextQuestion}>
+                <Text style={styles.buttonText}>
+                    {/* Muda texto do botão dependendo se é o fim do quiz ou da playlist */}
+                    {currentQuestionIndex < quiz.questions.length - 1 
+                        ? "Próxima Pergunta" 
+                        : (quizIds && currentIndex < quizIds.length - 1 ? "Próximo Quiz >>" : "Ver Resultados")}
+                </Text>
+            </TouchableOpacity>
+        ) : (
+            <TouchableOpacity 
+                style={[styles.button, !selectedOption && styles.buttonDisabled]} 
+                onPress={handleConfirmAnswer}
+                disabled={!selectedOption}
+            >
+                <Text style={styles.buttonText}>Confirmar</Text>
+            </TouchableOpacity>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
-// (Você precisa criar esse arquivo 'src/utils/quizLogic.js' com as funções)
-// function checkAnswer(question, selectedOption) {
-//   return selectedOption.isCorrect;
-// }
-// function shuffleArray(array) { 
-//   /* ... lógica de embaralhar ... */ 
-// }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
-  timerText: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
-  questionText: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  container: { flexGrow: 1, padding: SIZING.padding, backgroundColor: '#fff' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  quizTitle: { ...FONTS.h2, textAlign: 'center', marginBottom: 10, color: COLORS.primary },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  questionCount: { ...FONTS.body, color: '#666' },
+  timerText: { ...FONTS.body, fontWeight: 'bold', color: 'red' },
+  questionText: { ...FONTS.h2, marginBottom: 20, textAlign: 'center' },
   option: {
-    backgroundColor: '#eee',
+    backgroundColor: '#f8f9fa',
     padding: 15,
     marginVertical: 5,
-    borderRadius: 5,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#eee',
+    borderColor: '#e9ecef',
   },
-  optionSelected: {
-    borderColor: '#007bff', // Azul (selecionada)
-  },
-  optionCorrect: {
-    backgroundColor: '#d4edda', // Verde (correta)
-    borderColor: '#c3e6cb',
-  },
-  optionIncorrect: {
-    backgroundColor: '#f8d7da', // Vermelho (incorreta)
-    borderColor: '#f5c6cb',
-  },
-  scoreText: { fontSize: 18, textAlign: 'center', marginTop: 20 },
+  optionText: { ...FONTS.body },
+  optionSelected: { borderColor: COLORS.primary, backgroundColor: '#e7f1ff' },
+  optionCorrect: { backgroundColor: '#d4edda', borderColor: '#c3e6cb' },
+  optionIncorrect: { backgroundColor: '#f8d7da', borderColor: '#f5c6cb' },
+  footer: { marginTop: 30 },
+  button: { backgroundColor: COLORS.primary, padding: 15, borderRadius: 8, alignItems: 'center' },
+  buttonDisabled: { backgroundColor: '#ccc' },
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });

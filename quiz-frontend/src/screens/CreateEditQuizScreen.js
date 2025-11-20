@@ -37,10 +37,14 @@ export default function CreateEditQuizScreen({ route, navigation }) {
           const quiz = response.data;
           setTitle(quiz.title);
           setTimePerQuestion(quiz.timePerQuestion.toString());
+          
+          // Carrega as perguntas e converte isCorrect (0/1) para boolean
           setQuestions(quiz.questions.map(q => ({
             ...q,
             options: q.options.map(o => ({ ...o, isCorrect: !!o.isCorrect }))
           })));
+          
+          // Carrega as pastas já selecionadas
           setSelectedFolderIds(quiz.folderIds || []); 
         })
         .catch(err => Alert.alert("Erro", "Não foi possível carregar."))
@@ -106,15 +110,19 @@ export default function CreateEditQuizScreen({ route, navigation }) {
     }
     
     setLoading(true);
+    
+    // === CORREÇÃO AQUI ===
     const quizData = {
       title,
       timePerQuestion: parseInt(timePerQuestion) || 0,
+      // folderIds DEVE estar na raiz do objeto, não dentro de questions
+      folderIds: selectedFolderIds, 
       questions: questions.map(q => ({
         ...q,
-        options: q.options.map(o => ({ ...o, isCorrect: o.isCorrect ? 1 : 0 })),
-        folderIds: selectedFolderIds
+        options: q.options.map(o => ({ ...o, isCorrect: o.isCorrect ? 1 : 0 }))
       }))
     };
+    // =====================
 
     try {
       if (isEditMode) {
@@ -126,6 +134,7 @@ export default function CreateEditQuizScreen({ route, navigation }) {
       navigation.goBack(); 
     } catch (error) {
       Alert.alert("Erro", "Falha ao salvar.");
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -141,7 +150,6 @@ export default function CreateEditQuizScreen({ route, navigation }) {
         showsVerticalScrollIndicator={true}
       >
         <Text style={styles.label}>Título do Quiz</Text>
-        {/* CORREÇÃO 1: testID no lugar certo */}
         <TextInput 
           testID="quiz-title" 
           style={styles.input} 
@@ -150,7 +158,6 @@ export default function CreateEditQuizScreen({ route, navigation }) {
         />
 
         <Text style={styles.label}>Tempo por Pergunta (s)</Text>
-        {/* CORREÇÃO 2: testID único */}
         <TextInput  
           testID="quiz-time" 
           style={styles.input} 
@@ -161,15 +168,22 @@ export default function CreateEditQuizScreen({ route, navigation }) {
 
         <Text style={styles.label}>Adicionar às Pastas:</Text>
         <View style={styles.folderContainer}>
-          {allFolders.map(folder => (
-              <View key={folder.id} style={styles.optionContainer}>
-                <Text style={{flex: 1, ...FONTS.body}}>{folder.name}</Text>
-                <Switch
-                  value={selectedFolderIds.includes(folder.id)}
-                  onValueChange={() => toggleFolderSelection(folder.id)}
-                />
-              </View>
-          ))}
+          {allFolders.length === 0 ? (
+             <Text style={{color: '#888', padding: 10}}>Nenhuma pasta criada. Crie pastas no Dashboard.</Text>
+          ) : (
+            allFolders.map(folder => (
+                <View key={folder.id} style={styles.optionContainer}>
+                  <Text style={{flex: 1, ...FONTS.body}}>{folder.name}</Text>
+                  <Switch
+                    value={selectedFolderIds.includes(folder.id)}
+                    onValueChange={() => toggleFolderSelection(folder.id)}
+                    // Cores para facilitar visualização
+                    trackColor={{ false: "#767577", true: "#81b0ff" }}
+                    thumbColor={selectedFolderIds.includes(folder.id) ? "#007bff" : "#f4f3f4"}
+                  />
+                </View>
+            ))
+          )}
         </View>
 
         {questions.map((q, qIndex) => (
@@ -191,7 +205,7 @@ export default function CreateEditQuizScreen({ route, navigation }) {
                   value={o.optionText}
                   onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
                 />
-                <Text>Correta?</Text>
+                <Text style={{marginRight: 5}}>Correta?</Text>
                 <Switch
                   value={o.isCorrect}
                   onValueChange={() => handleSetCorrect(qIndex, oIndex)}
@@ -206,15 +220,18 @@ export default function CreateEditQuizScreen({ route, navigation }) {
            <Button title="Adicionar Pergunta" onPress={addQuestion} />
         </View>
 
-        {/* CORREÇÃO 3: Botão Salvar virou TouchableOpacity para o Selenium achar pelo texto */}
         <TouchableOpacity
           onPress={handleSave}
           style={[styles.saveButton, (!isFormValid() || loading) && styles.disabledButton]}
           disabled={!isFormValid() || loading}
         >
-           <Text style={styles.saveButtonText}>
-             {loading ? "Salvando..." : "Salvar Quiz"}
-           </Text>
+           {loading ? (
+             <ActivityIndicator color="#fff" />
+           ) : (
+             <Text style={styles.saveButtonText}>
+               {isEditMode ? "Atualizar Quiz" : "Salvar Quiz"}
+             </Text>
+           )}
         </TouchableOpacity>
 
       </ScrollView>
@@ -226,7 +243,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.lightGray,
-    // Correção do Scroll no Web
     ...Platform.select({
       web: { height: '100vh' }
     })
@@ -248,7 +264,6 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
   },
-  // Estilos do Botão Salvar
   saveButton: {
     backgroundColor: COLORS.primary || '#007bff',
     padding: 15,

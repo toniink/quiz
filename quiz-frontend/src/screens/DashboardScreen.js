@@ -184,15 +184,12 @@ export default function DashboardScreen({ navigation }) {
       <Text style={styles.sectionTitle}>Pastas</Text>
       <FlatList 
         data={data.folders}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{item.name}</Text>
-          </View>
-        )}
+        renderItem={renderFolderItem}
         keyExtractor={(item) => item.id.toString()}
       />
 
-      <Text style={styles.sectionTitle}>Quizzes (Sem Pasta)</Text>
+      {/* MUDE O TEXTO AQUI: De "Quizzes (Sem Pasta)" para "Todos os Quizzes" */}
+      <Text style={styles.sectionTitle}>Todos os Quizzes</Text>
       <FlatList
         data={data.quizzes}
         renderItem={renderQuizItem}

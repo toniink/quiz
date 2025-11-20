@@ -1,23 +1,25 @@
-// index.js
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const db = require('./database.js'); // Nosso banco
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('./authMiddleware');
-const SECRET_KEY = 'pipoca'; // Mude isso!
-
+const SECRET_KEY = 'pipoca'; // Mude isso em produção!
 
 const app = express();
-const PORT = 4000; // Porta do backend
+const PORT = 4000;
 
 // Middlewares
-app.use(cors()); // Permite requisições de outras origens (seu app Expo)
-app.use(express.json()); // Permite ao Express entender JSON
+app.use(cors());
+app.use(express.json());
 
-// --- ROTA DE CADASTRO ---
+// =====================================================
+// 1. AUTENTICAÇÃO (ROTAS PÚBLICAS)
+// =====================================================
+
+// ROTA DE CADASTRO
 app.post('/register', async (req, res) => {
-  console.log('--> RECEBI UM PEDIDO DE REGISTRO:', req.body.email);
+  console.log('--> Nova tentativa de registro:', req.body.email);
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
@@ -25,13 +27,10 @@ app.post('/register', async (req, res) => {
   }
 
   try {
-    // Criptografa a senha antes de salvar
-    const hashedPassword = await bcrypt.hash(password, 10); // 10 é o "salt rounds"
-
+    const hashedPassword = await bcrypt.hash(password, 10);
     const sql = 'INSERT INTO users (username, email, password) VALUES (?, ?, ?)';
     db.run(sql, [username, email, hashedPassword], function (err) {
       if (err) {
-        // 'UNIQUE constraint failed' significa que o email já existe
         if (err.message.includes('UNIQUE')) {
             return res.status(400).json({ error: 'Este e-mail já está em uso' });
         }
@@ -44,38 +43,29 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// --- ROTA DE LOGIN ---
+// ROTA DE LOGIN
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
-
   if (!email || !password) {
     return res.status(400).json({ error: 'E-mail e senha são obrigatórios' });
   }
 
   const sql = 'SELECT * FROM users WHERE email = ?';
   db.get(sql, [email], async (err, user) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    // Usuário não encontrado
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
-    // Compara a senha enviada com o hash salvo no banco
     const isPasswordMatch = await bcrypt.compare(password, user.password);
 
     if (isPasswordMatch) {
-      // SUCESSO! Gere o Token.
       const token = jwt.sign(
         { id: user.id, email: user.email, username: user.username },
         SECRET_KEY,
-        { expiresIn: '8h' } // Token expira em 8 horas
+        { expiresIn: '8h' }
       );
-
       res.status(200).json({ 
         message: 'Login bem-sucedido!',
-        token: token, // Envia o token para o cliente
+        token: token,
         user: { id: user.id, username: user.username, email: user.email }
       });
     } else {
@@ -84,35 +74,21 @@ app.post('/login', (req, res) => {
   });
 });
 
-// --- ROTAS PROTEGIDAS (Exigem Login/Token) ---
+// =====================================================
+// 2. DASHBOARD (PROTEGIDO)
+// =====================================================
 
-// Rota para buscar todos os Quizzes e Pastas do usuário
-// (Implementa "Agrupamento por Pastas")
-// quiz-backend/index.js
-
-// --- ROTA DE BUSCAR DASHBOARD (Corrigida para M:N) ---
 app.get('/dashboard', authMiddleware, (req, res) => {
-  const userId = req.user.id; // Pegamos o ID do usuário (do token)
-  let response = {
-    folders: [],
-    quizzes: [] // Quizzes sem pasta
-  };
+  const userId = req.user.id;
+  let response = { folders: [], quizzes: [] };
 
   const folderQuery = "SELECT * FROM folders WHERE userId = ?";
   db.all(folderQuery, [userId], (err, folders) => {
     if (err) return res.status(500).json({ error: err.message });
     response.folders = folders;
 
-    // CORREÇÃO:
-    // Agora buscamos quizzes do usuário (userId)
-    // que NÃO ESTÃO EM (NOT IN) na tabela de junção 'quiz_folders'
-    const quizQuery = `
-      SELECT * FROM quizzes
-      WHERE userId = ? 
-      AND id NOT IN (
-        SELECT quizId FROM quiz_folders
-      )
-    `;
+    // Busca TODOS os quizzes do usuário (não filtra mais os que têm pasta)
+    const quizQuery = "SELECT * FROM quizzes WHERE userId = ?";
 
     db.all(quizQuery, [userId], (err, quizzes) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -122,256 +98,11 @@ app.get('/dashboard', authMiddleware, (req, res) => {
   });
 });
 
-// Rota para buscar Quizzes DE UMA PASTA
-// (Implementa "Filtragem")
-app.get('/folders/:id/quizzes', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const folderId = req.params.id;
-  
-  const sql = "SELECT * FROM quizzes WHERE userId = ? AND folderId = ?";
-  db.all(sql, [userId, folderId], (err, quizzes) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(quizzes);
-  });
-});
+// =====================================================
+// 3. GESTÃO DE PASTAS (PROTEGIDO)
+// =====================================================
 
-
-// Rota para DELETAR um Quiz
-// (Implementa "Funcionalidade de Deleção")
-app.delete('/quizzes/:id', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const quizId = req.params.id;
-
-  // Deleta o quiz APENAS se ele pertencer ao usuário logado
-  const sql = "DELETE FROM quizzes WHERE id = ? AND userId = ?";
-  db.run(sql, [quizId, userId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) {
-      // Nenhum quiz foi deletado (ou não pertence ao usuário ou não existe)
-      return res.status(404).json({ error: "Quiz não encontrado ou não autorizado" });
-    }
-    // As perguntas e alternativas são deletadas automaticamente (ON DELETE CASCADE)
-    res.status(200).json({ message: 'Quiz deletado com sucesso' });
-  });
-});
-
-// ROTA PARA CRIAR UM NOVO QUIZ (MODIFICADA PARA M:N)
-app.post('/quizzes', authMiddleware, (req, res) => {
-  const userId = req.user.id;
-  const { title, timePerQuestion, folderIds, questions } = req.body;
-
-  if (!title || !questions || questions.length === 0) {
-    return res.status(400).json({ error: "Título e pelo menos uma pergunta são obrigatórios" });
-  }
-
-  db.serialize(() => {
-    // 1. Cria o Quiz (sem folderId)
-    const quizSql = `INSERT INTO quizzes (title, timePerQuestion, userId) VALUES (?, ?, ?)`;
-    db.run(quizSql, [title, timePerQuestion || 0, userId], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      
-      const quizId = this.lastID;
-
-      // 2. Associa o Quiz às Pastas (na tabela de junção)
-      if (folderIds && folderIds.length > 0) {
-        const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
-        folderIds.forEach(folderId => {
-          db.run(assocSql, [quizId, folderId]);
-        });
-      }
-
-      const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
-      const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
-
-      questions.forEach(q => {
-        db.run(questionSql, [q.questionText, quizId], function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          
-          const questionId = this.lastID;
-
-          q.options.forEach(o => {
-            db.run(optionSql, [o.optionText, o.isCorrect ? 1 : 0, questionId], (err) => {
-              if (err) return res.status(500).json({ error: err.message });
-            });
-          });
-        });
-      });
-      
-      res.status(201).json({ message: "Quiz criado com sucesso!", quizId: quizId });
-    });
-  });
-});
-
-// ROTA PARA BUSCAR OS DETALHES DE UM QUIZ (para Jogar ou Editar)
-app.get('/quizzes/:id', authMiddleware, (req, res) => {
-  const quizId = req.params.id;
-  const userId = req.user.id;
-
-  const quizSql = "SELECT * FROM quizzes WHERE id = ? AND userId = ?";
-  
-  db.get(quizSql, [quizId, userId], (err, quiz) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!quiz) return res.status(404).json({ error: "Quiz não encontrado" });
-
-    // 1. Achamos o quiz, agora buscamos as perguntas
-    const questionsSql = "SELECT * FROM questions WHERE quizId = ?";
-    db.all(questionsSql, [quizId], async (err, questions) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      // 2. Para cada pergunta, buscamos as alternativas
-      // Usamos Promise.all para lidar com as chamadas assíncronas em loop
-      const fullQuestions = await Promise.all(
-        questions.map(q => {
-          return new Promise((resolve, reject) => {
-            const optionsSql = "SELECT * FROM options WHERE questionId = ?";
-            db.all(optionsSql, [q.id], (err, options) => {
-              if (err) reject(err);
-              // (Teste Unitário: shuffleArray) Você pode embaralhar as 'options' aqui se quiser
-              resolve({ ...q, options: options });
-            });
-          });
-        })
-      );
-      
-      // (Teste Unitário: shuffleArray) Você pode embaralhar as 'fullQuestions' aqui
-      // quiz.questions = shuffleArray(fullQuestions);
-      quiz.questions = fullQuestions; 
-
-      // 3. Busca os IDs das pastas associadas
-      const folderIdsSql = "SELECT folderId FROM quiz_folders WHERE quizId = ?";
-      db.all(folderIdsSql, [quizId], (err, folderLinks) => {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        // Mapeia de [{folderId: 1}, {folderId: 3}] para [1, 3]
-        quiz.folderIds = folderLinks.map(f => f.folderId);
-        
-        // Envia o objeto completo do quiz
-        res.json(quiz); 
-      });
-      
-      res.json(quiz);
-    });
-  });
-});
-
-
-// ROTA PARA ATUALIZAR UM QUIZ (MODIFICADA PARA M:N)
-app.put('/quizzes/:id', authMiddleware, (req, res) => {
-  const quizId = req.params.id;
-  const userId = req.user.id;
-  const { title, timePerQuestion, folderIds, questions } = req.body;
-
-
-  db.serialize(() => {
-    // 1. Atualiza o Quiz principal
-    const updateSql = `UPDATE quizzes SET title = ?, timePerQuestion = ?, folderId = ? 
-                       WHERE id = ? AND userId = ?`;
-                       
-    db.run(updateSql, [title, timePerQuestion || 0, folderId || null, quizId, userId], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: "Quiz não encontrado ou não autorizado"});
-    });
-
-    // 2. Deleta TODAS as associações de pastas antigas
-    const deleteAssocSql = "DELETE FROM quiz_folders WHERE quizId = ?";
-    db.run(deleteAssocSql, [quizId]);
-
-    // 3. Re-cria as associações de pastas
-    if (folderIds && folderIds.length > 0) {
-      const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
-      folderIds.forEach(folderId => {
-        db.run(assocSql, [quizId, folderId]);
-      });
-    }
-
-    // 4. Deleta todas as perguntas antigas (ON DELETE CASCADE cuidará das alternativas)
-    const deleteSql = "DELETE FROM questions WHERE quizId = ?";
-    db.run(deleteSql, [quizId]);
-
-    // 5. Recria (mesma lógica do POST)
-    const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
-    const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
-
-    questions.forEach(q => {
-      db.run(questionSql, [q.questionText, quizId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        const questionId = this.lastID;
-        q.options.forEach(o => {
-          db.run(optionSql, [o.optionText, o.isCorrect ? 1 : 0, questionId]);
-        });
-      });
-    });
-
-    res.status(200).json({ message: "Quiz atualizado com sucesso!" });
-  });
-
-
-  
-
-
-
-
-});
-
-app.post('/folders', authMiddleware, (req, res) => {
-  const { name } = req.body;
-  const userId = req.user.id;
-  if (!name) {
-    return res.status(400).json({ error: 'O nome da pasta é obrigatório' });
-  }
-  const sql = 'INSERT INTO folders (name, userId) VALUES (?, ?)';
-  db.run(sql, [name, userId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    // Retorna a nova pasta criada
-    res.status(201).json({ id: this.lastID, name: name, userId: userId });
-  });
-});
-
-// ROTA PARA BUSCAR UMA PASTA E SEUS QUIZZES (O "Agrupamento")
-app.get('/folders/:id', authMiddleware, (req, res) => {
-  const folderId = req.params.id;
-  const userId = req.user.id;
-  let response = { folder: null, quizzes: [] };
-
-  // 1. Pega os detalhes da pasta (e verifica se pertence ao usuário)
-  const folderSql = "SELECT * FROM folders WHERE id = ? AND userId = ?";
-  db.get(folderSql, [folderId, userId], (err, folder) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!folder) return res.status(404).json({ error: 'Pasta não encontrada' });
-    response.folder = folder;
-
-    // 2. Pega todos os quizzes associados a essa pasta (usando a tabela de junção)
-    const quizzesSql = `
-      SELECT q.* FROM quizzes q
-      JOIN quiz_folders qf ON q.id = qf.quizId
-      WHERE qf.folderId = ? AND q.userId = ?
-    `;
-    db.all(quizzesSql, [folderId, userId], (err, quizzes) => {
-      if (err) return res.status(500).json({ error: err.message });
-      response.quizzes = quizzes;
-      res.json(response); // Retorna a pasta e seus quizzes
-    });
-  });
-});
-
-// ROTA PARA DELETAR UMA PASTA
-app.delete('/folders/:id', authMiddleware, (req, res) => {
-  const folderId = req.params.id;
-  const userId = req.user.id;
-
-  // Deleta a pasta APENAS se ela pertencer ao usuário
-  const sql = "DELETE FROM folders WHERE id = ? AND userId = ?";
-  db.run(sql, [folderId, userId], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) {
-      return res.status(404).json({ error: "Pasta não encontrada ou não autorizada" });
-    }
-    // O 'ON DELETE CASCADE' na tabela 'quiz_folders' limpará as associações
-    res.status(200).json({ message: 'Pasta deletada com sucesso' });
-  });
-});
-
-// ROTA PARA BUSCAR TODAS AS PASTAS DO USUÁRIO (para o formulário)
+// Listar todas as pastas
 app.get('/folders', authMiddleware, (req, res) => {
   const userId = req.user.id;
   const sql = "SELECT * FROM folders WHERE userId = ?";
@@ -381,14 +112,240 @@ app.get('/folders', authMiddleware, (req, res) => {
   });
 });
 
+// Criar Pasta
+app.post('/folders', authMiddleware, (req, res) => {
+  const { name } = req.body;
+  const userId = req.user.id;
+  if (!name) {
+    return res.status(400).json({ error: 'O nome da pasta é obrigatório' });
+  }
+  const sql = 'INSERT INTO folders (name, userId) VALUES (?, ?)';
+  db.run(sql, [name, userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.status(201).json({ id: this.lastID, name: name, userId: userId });
+  });
+});
 
+// Deletar Pasta (Remove a pasta, mas mantém os quizzes graças à tabela de junção)
+app.delete('/folders/:id', authMiddleware, (req, res) => {
+  const folderId = req.params.id;
+  const userId = req.user.id;
+  const sql = "DELETE FROM folders WHERE id = ? AND userId = ?";
+  db.run(sql, [folderId, userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: "Pasta não encontrada" });
+    res.status(200).json({ message: 'Pasta deletada com sucesso' });
+  });
+});
 
+// Detalhes da Pasta + Seus Quizzes
+app.get('/folders/:id', authMiddleware, (req, res) => {
+  const folderId = req.params.id;
+  const userId = req.user.id;
+  let response = { folder: null, quizzes: [] };
 
-// Inicia o servidor
+  const folderSql = "SELECT * FROM folders WHERE id = ? AND userId = ?";
+  db.get(folderSql, [folderId, userId], (err, folder) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!folder) return res.status(404).json({ error: 'Pasta não encontrada' });
+    response.folder = folder;
+
+    // Busca quizzes via tabela de junção
+    const quizzesSql = `
+      SELECT q.* FROM quizzes q
+      JOIN quiz_folders qf ON q.id = qf.quizId
+      WHERE qf.folderId = ? AND q.userId = ?
+    `;
+    db.all(quizzesSql, [folderId, userId], (err, quizzes) => {
+      if (err) return res.status(500).json({ error: err.message });
+      response.quizzes = quizzes;
+      res.json(response);
+    });
+  });
+});
+
+// --- ROTA: REMOVER QUIZZES DA PASTA (BULK ACTION) ---
+app.post('/folders/:id/remove_quizzes', authMiddleware, (req, res) => {
+  const folderId = req.params.id;
+  const userId = req.user.id;
+  const { quizIds } = req.body; // Espera array [1, 2, 3]
+
+  if (!quizIds || !Array.isArray(quizIds) || quizIds.length === 0) {
+    return res.status(400).json({ error: "Lista de quizzes inválida" });
+  }
+
+  // Verifica propriedade da pasta
+  db.get("SELECT id FROM folders WHERE id = ? AND userId = ?", [folderId, userId], (err, folder) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!folder) return res.status(404).json({ error: "Pasta não encontrada" });
+
+    // Remove associações
+    const placeholders = quizIds.map(() => '?').join(',');
+    const sql = `DELETE FROM quiz_folders WHERE folderId = ? AND quizId IN (${placeholders})`;
+    const params = [folderId, ...quizIds];
+
+    db.run(sql, params, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: `${this.changes} quizzes removidos da pasta.` });
+    });
+  });
+});
+
+// =====================================================
+// 4. GESTÃO DE QUIZZES (PROTEGIDO)
+// =====================================================
+
+// Criar Quiz
+app.post('/quizzes', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { title, timePerQuestion, folderIds, questions } = req.body;
+
+  if (!title || !questions || questions.length === 0) {
+    return res.status(400).json({ error: "Título e perguntas obrigatórios" });
+  }
+
+  db.serialize(() => {
+    // 1. Cria o Quiz
+    const quizSql = `INSERT INTO quizzes (title, timePerQuestion, userId) VALUES (?, ?, ?)`;
+    db.run(quizSql, [title, timePerQuestion || 0, userId], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      
+      const quizId = this.lastID;
+
+      // 2. Associa às Pastas (se houver)
+      if (folderIds && Array.isArray(folderIds) && folderIds.length > 0) {
+        const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
+        folderIds.forEach(folderId => {
+          db.run(assocSql, [quizId, folderId]);
+        });
+      }
+
+      // 3. Cria Perguntas e Opções
+      const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
+      const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
+
+      questions.forEach(q => {
+        db.run(questionSql, [q.questionText, quizId], function(err) {
+          if (err) return console.error(err);
+          const questionId = this.lastID;
+          q.options.forEach(o => {
+            db.run(optionSql, [o.optionText, o.isCorrect ? 1 : 0, questionId]);
+          });
+        });
+      });
+      
+      res.status(201).json({ message: "Quiz criado com sucesso!", quizId: quizId });
+    });
+  });
+});
+
+// Buscar Detalhes do Quiz (para Editar/Jogar)
+app.get('/quizzes/:id', authMiddleware, (req, res) => {
+  const quizId = req.params.id;
+  const userId = req.user.id;
+
+  const quizSql = "SELECT * FROM quizzes WHERE id = ? AND userId = ?";
+  db.get(quizSql, [quizId, userId], (err, quiz) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!quiz) return res.status(404).json({ error: "Quiz não encontrado" });
+
+    // 1. Busca perguntas e opções
+    const questionsSql = "SELECT * FROM questions WHERE quizId = ?";
+    db.all(questionsSql, [quizId], async (err, questions) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // 2. Busca pastas associadas (para preencher os switches na edição)
+      const folderIdsSql = "SELECT folderId FROM quiz_folders WHERE quizId = ?";
+      db.all(folderIdsSql, [quizId], async (err, folderLinks) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        quiz.folderIds = folderLinks.map(f => f.folderId);
+
+        const fullQuestions = await Promise.all(
+          questions.map(q => {
+            return new Promise((resolve, reject) => {
+              const optionsSql = "SELECT * FROM options WHERE questionId = ?";
+              db.all(optionsSql, [q.id], (err, options) => {
+                if (err) reject(err);
+                resolve({ ...q, options: options });
+              });
+            });
+          })
+        );
+        
+        quiz.questions = fullQuestions; 
+        res.json(quiz);
+      });
+    });
+  });
+});
+
+// Atualizar Quiz
+app.put('/quizzes/:id', authMiddleware, (req, res) => {
+  const quizId = req.params.id;
+  const userId = req.user.id;
+  const { title, timePerQuestion, folderIds, questions } = req.body;
+
+  db.serialize(() => {
+    // 1. Atualiza dados básicos
+    const updateSql = `UPDATE quizzes SET title = ?, timePerQuestion = ? WHERE id = ? AND userId = ?`;
+    db.run(updateSql, [title, timePerQuestion || 0, quizId, userId], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: "Quiz não encontrado" });
+    });
+
+    // 2. Limpa associações antigas de pastas
+    db.run("DELETE FROM quiz_folders WHERE quizId = ?", [quizId]);
+
+    // 3. Recria associações de pastas
+    if (folderIds && Array.isArray(folderIds)) {
+      const assocSql = `INSERT INTO quiz_folders (quizId, folderId) VALUES (?, ?)`;
+      folderIds.forEach(folderId => {
+        db.run(assocSql, [quizId, folderId]);
+      });
+    }
+
+    // 4. Limpa perguntas antigas
+    db.run("DELETE FROM questions WHERE quizId = ?", [quizId]);
+
+    // 5. Recria perguntas e opções
+    const questionSql = `INSERT INTO questions (questionText, quizId) VALUES (?, ?)`;
+    const optionSql = `INSERT INTO options (optionText, isCorrect, questionId) VALUES (?, ?, ?)`;
+
+    questions.forEach(q => {
+      db.run(questionSql, [q.questionText, quizId], function(err) {
+        if (err) return console.error(err);
+        const questionId = this.lastID;
+        q.options.forEach(o => {
+          db.run(optionSql, [o.optionText, o.isCorrect ? 1 : 0, questionId]);
+        });
+      });
+    });
+
+    res.status(200).json({ message: "Quiz atualizado com sucesso!" });
+  });
+});
+
+// Deletar Quiz
+app.delete('/quizzes/:id', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const quizId = req.params.id;
+  const sql = "DELETE FROM quizzes WHERE id = ? AND userId = ?";
+  db.run(sql, [quizId, userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: "Quiz não encontrado" });
+    res.status(200).json({ message: 'Quiz deletado com sucesso' });
+  });
+});
+
+// =====================================================
+// INICIALIZAÇÃO DO SERVIDOR
+// =====================================================
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Servidor backend rodando em http://localhost:${PORT}`);
   });
 }
 
-module.exports = app; // Exporta o app para o Jest testar
+module.exports = app;
