@@ -164,6 +164,26 @@ app.get('/folders/:id', authMiddleware, (req, res) => {
   });
 });
 
+// ROTA: REMOVER MÚLTIPLAS PASTAS (BULK DELETE)
+app.post('/folders/bulk_delete', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+  const { folderIds } = req.body; 
+
+  if (!folderIds || !Array.isArray(folderIds) || folderIds.length === 0) {
+    return res.status(400).json({ error: "Lista de pastas inválida" });
+  }
+
+  // Deleta apenas pastas que pertencem ao usuário
+  const placeholders = folderIds.map(() => '?').join(',');
+  const sql = `DELETE FROM folders WHERE userId = ? AND id IN (${placeholders})`;
+  const params = [userId, ...folderIds];
+
+  db.run(sql, params, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: `${this.changes} pastas deletadas.` });
+  });
+});
+
 // --- ROTA: REMOVER QUIZZES DA PASTA (BULK ACTION) ---
 app.post('/folders/:id/remove_quizzes', authMiddleware, (req, res) => {
   const folderId = req.params.id;

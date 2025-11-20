@@ -77,35 +77,57 @@ export default function FolderScreen({ route }) {
   const handleBulkRemove = async () => {
     if (selectedQuizIds.length === 0) return;
 
-    Alert.alert(
-      "Remover da Pasta",
-      `Deseja remover ${selectedQuizIds.length} quizzes desta pasta? \n\nEles NÃO serão apagados do sistema, apenas desta pasta.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Remover", 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              // Chama a API para remover a associação
-              await removeQuizzesFromFolder(folderId, selectedQuizIds);
-              
-              setSelectionMode(false);
-              setSelectedQuizIds([]);
-              fetchData(); // Recarrega a lista
-              Alert.alert("Sucesso", "Quizzes removidos da pasta.");
-            } catch (error) {
-              Alert.alert("Erro", "Falha ao remover quizzes.");
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
-  };
+    console.log("Botão Remover Clicado. IDs:", selectedQuizIds);
 
+    // Função interna que faz o trabalho pesado
+    const executeRemove = async () => {
+      try {
+        setLoading(true);
+        console.log(`Enviando requisição para remover da pasta ${folderId}...`);
+        
+        await removeQuizzesFromFolder(folderId, selectedQuizIds);
+        
+        console.log("Sucesso! Atualizando lista...");
+        setSelectionMode(false);
+        setSelectedQuizIds([]);
+        fetchData(); // Recarrega a lista
+        
+        // Pequeno delay para garantir que o loading saia antes do alerta
+        setTimeout(() => Alert.alert("Sucesso", "Quizzes removidos da pasta."), 100);
+      } catch (error) {
+        console.error("ERRO AO REMOVER:", error);
+        console.error("Detalhes:", error.response?.data || error.message);
+        Alert.alert("Erro", "Falha ao remover quizzes. Verifique o console (F12).");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Lógica diferente para Web vs Mobile
+    if (Platform.OS === 'web') {
+      // Na Web, usamos o confirm padrão do navegador que é 100% confiável
+      const confirmed = window.confirm(
+        `Deseja remover ${selectedQuizIds.length} quizzes desta pasta?\n\nEles NÃO serão apagados do sistema.`
+      );
+      if (confirmed) {
+        executeRemove();
+      }
+    } else {
+      // No Mobile, usamos o Alert nativo bonitinho
+      Alert.alert(
+        "Remover da Pasta",
+        `Deseja remover ${selectedQuizIds.length} quizzes desta pasta?\n\nEles NÃO serão apagados do sistema.`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { 
+            text: "Remover", 
+            style: 'destructive',
+            onPress: executeRemove 
+          }
+        ]
+      );
+    }
+  };
   // --- LÓGICA NORMAL (Play All, Deletar Unitário) ---
 
   const handlePlayAll = () => {

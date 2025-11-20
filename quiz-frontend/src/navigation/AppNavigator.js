@@ -12,6 +12,7 @@ import CreateEditQuizScreen from '../screens/CreateEditQuizScreen'; // Formulár
 import PlayQuizScreen from '../screens/PlayQuizScreen'; // O jogo
 import ResultsScreen from '../screens/ResultsScreen'; // Placar final
 import FolderScreen from '../screens/FolderScreen';
+import FoldersListScreen from '../screens/FoldersListScreen';
 
 const Stack = createStackNavigator();
 
@@ -45,6 +46,11 @@ function MainStack() {
         name="Dashboard" 
         component={DashboardScreen} 
         options={{ title: 'Meus Quizzes' }} 
+      />
+      <Stack.Screen 
+        name="FoldersList" 
+        component={FoldersListScreen} 
+        options={{ title: 'Minhas Pastas' }} 
       />
       <Stack.Screen 
         name="Folder" 
