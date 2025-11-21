@@ -358,6 +358,41 @@ app.delete('/quizzes/:id', authMiddleware, (req, res) => {
   });
 });
 
+// 5. GESTÃO DE PERFIL (NOVO)
+
+// Atualizar Perfil (Nome e Senha)
+app.put('/profile', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const { username, password } = req.body;
+
+  db.serialize(async () => {
+    // 1. Atualiza o nome
+    if (username) {
+      db.run("UPDATE users SET username = ? WHERE id = ?", [username, userId]);
+    }
+
+    // 2. Atualiza a senha (se fornecida)
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      db.run("UPDATE users SET password = ? WHERE id = ?", [hashedPassword, userId]);
+    }
+
+    res.json({ message: "Perfil atualizado com sucesso!" });
+  });
+});
+
+// DELETAR CONTA (PERIGO!)
+app.delete('/profile', authMiddleware, (req, res) => {
+  const userId = req.user.id;
+
+  // Graças ao ON DELETE CASCADE configurado no database.js,
+  // apagar o user apaga automaticamente seus quizzes e pastas.
+  db.run("DELETE FROM users WHERE id = ?", [userId], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Conta excluída permanentemente." });
+  });
+});
+
 // =====================================================
 // INICIALIZAÇÃO DO SERVIDOR
 // =====================================================

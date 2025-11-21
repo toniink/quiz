@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, ActivityIndicator, TouchableOpacity, Alert, ScrollView, Platform } from 'react-native';
+import { 
+  View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, 
+  Alert, ScrollView, Platform 
+} from 'react-native';
 import { getQuizDetails } from '../services/api';
 import { checkAnswer, shuffleArray } from '../utils/quizLogic';
-import { COLORS, SIZING, FONTS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { SIZING, FONTS } from '../constants/theme';
 
 export default function PlayQuizScreen({ route, navigation }) {
-  // Aceita um ID único (modo antigo) OU uma lista de IDs (modo "Jogar Todos")
-  // Também aceita score acumulado de quizzes anteriores
+  const { colors } = useTheme();
   const { quizId, quizIds, currentIndex = 0, accumulatedScore = 0, accumulatedTotal = 0 } = route.params;
-
-  // Determina qual é o ID atual a ser jogado
   const activeQuizId = quizIds ? quizIds[currentIndex] : quizId;
 
   const [loading, setLoading] = useState(true);
@@ -26,13 +27,10 @@ export default function PlayQuizScreen({ route, navigation }) {
         setLoading(true);
         const response = await getQuizDetails(activeQuizId);
         const loadedQuiz = response.data;
-        
-        // Randomização
         loadedQuiz.questions = shuffleArray(loadedQuiz.questions.map(q => ({
           ...q,
           options: shuffleArray(q.options)
         })));
-        
         setQuiz(loadedQuiz);
         setTimer(loadedQuiz.timePerQuestion || 0);
       } catch (error) {
@@ -45,10 +43,8 @@ export default function PlayQuizScreen({ route, navigation }) {
     loadQuiz();
   }, [activeQuizId]);
 
-  // Timer Logic
   useEffect(() => {
     if (!quiz || quiz.timePerQuestion === 0 || isAnswerConfirmed) return;
-    
     if (timer > 0) {
       const interval = setInterval(() => setTimer(t => t - 1), 1000);
       return () => clearInterval(interval);
@@ -65,27 +61,19 @@ export default function PlayQuizScreen({ route, navigation }) {
   const handleConfirmAnswer = () => {
     if (isAnswerConfirmed) return;
     setIsAnswerConfirmed(true);
-
     const currentQuestion = quiz.questions[currentQuestionIndex];
-    // checkAnswer espera o objeto da pergunta e o ID da opção selecionada
     const isCorrect = checkAnswer(currentQuestion, selectedOption); 
-    
-    if (isCorrect) {
-      setScore(s => s + 1);
-    }
+    if (isCorrect) setScore(s => s + 1);
   };
 
   const handleNextQuestion = () => {
     const nextIndex = currentQuestionIndex + 1;
-    
     if (nextIndex < quiz.questions.length) {
-      // Próxima pergunta do MESMO quiz
       setIsAnswerConfirmed(false);
       setSelectedOption(null);
       setCurrentQuestionIndex(nextIndex);
       setTimer(quiz.timePerQuestion || 0);
     } else {
-      // --- FIM DESTE QUIZ ---
       finishCurrentQuiz();
     }
   };
@@ -94,10 +82,7 @@ export default function PlayQuizScreen({ route, navigation }) {
     const currentQuizScore = score;
     const currentQuizTotal = quiz.questions.length;
 
-    // Se estivermos no modo "Jogar Todos" (quizIds existe)
     if (quizIds && currentIndex < quizIds.length - 1) {
-        // Ainda tem quizzes na fila!
-        // Navega para a MESMA tela, mas com o próximo índice e score acumulado
         navigation.replace('PlayQuiz', {
             quizIds: quizIds,
             currentIndex: currentIndex + 1,
@@ -105,7 +90,6 @@ export default function PlayQuizScreen({ route, navigation }) {
             accumulatedTotal: accumulatedTotal + currentQuizTotal
         });
     } else {
-        // Acabou tudo (ou era só um quiz). Vai para Resultados.
         navigation.replace('Results', { 
             score: accumulatedScore + currentQuizScore, 
             total: accumulatedTotal + currentQuizTotal 
@@ -113,64 +97,57 @@ export default function PlayQuizScreen({ route, navigation }) {
     }
   };
 
-  // --- RENDERIZAÇÃO ---
-
   const getOptionStyle = (option) => {
     const { id, isCorrect } = option;
+    const baseStyle = [styles.option, { backgroundColor: colors.card, borderColor: colors.border }];
     if (!isAnswerConfirmed) {
-      return selectedOption === id ? styles.optionSelected : styles.option;
+      return selectedOption === id 
+        ? [baseStyle, { borderColor: colors.primary, backgroundColor: colors.inputBg, borderWidth: 2 }] 
+        : baseStyle;
     }
-    if (isCorrect) return [styles.option, styles.optionCorrect];
-    if (selectedOption === id && !isCorrect) return [styles.option, styles.optionIncorrect];
-    return styles.option;
+    if (isCorrect) return [baseStyle, { backgroundColor: 'rgba(40, 167, 69, 0.15)', borderColor: colors.success }];
+    if (selectedOption === id && !isCorrect) return [baseStyle, { backgroundColor: 'rgba(220, 53, 69, 0.15)', borderColor: colors.danger }];
+    return baseStyle;
   };
 
-  if (loading) {
-    return (
-        <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={{marginTop: 10}}>Carregando Quiz...</Text>
-        </View>
-    );
-  }
+  if (loading) return <View style={[styles.center, {backgroundColor: colors.background}]}><ActivityIndicator size="large" color={colors.primary}/></View>;
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
-  // Calcula progresso geral se estiver em playlist
-  const headerText = quizIds 
-    ? `Quiz ${currentIndex + 1} de ${quizIds.length}: ${quiz.title}`
-    : quiz.title;
+  const headerText = quizIds ? `Quiz ${currentIndex + 1} de ${quizIds.length}` : quiz.title;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.quizTitle}>{headerText}</Text>
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.quizTitle, { color: colors.text }]}>{headerText}</Text>
       
       <View style={styles.infoRow}>
-         <Text style={styles.questionCount}>
-            Pergunta {currentQuestionIndex + 1}/{quiz.questions.length}
-         </Text>
-         <Text style={styles.timerText}>
-            {quiz.timePerQuestion > 0 ? `⏱️ ${timer}s` : ''}
-         </Text>
+         <Text style={[styles.infoText, { color: colors.subText }]}>Questão {currentQuestionIndex + 1}/{quiz.questions.length}</Text>
+         <Text style={[styles.infoText, { color: colors.danger }]}>{quiz.timePerQuestion > 0 ? `⏱️ ${timer}s` : ''}</Text>
       </View>
       
-      <Text style={styles.questionText}>{currentQuestion.questionText}</Text>
+      <View style={[styles.questionCard, { backgroundColor: colors.card }]}>
+        <Text style={[styles.questionText, { color: colors.text }]}>{currentQuestion.questionText}</Text>
+      </View>
       
-      {currentQuestion.options.map(option => (
+      {currentQuestion.options.map((option, index) => (
         <TouchableOpacity
           key={option.id}
+          testID={`option-${index}`} // ID para facilitar seleção da opção
           style={getOptionStyle(option)}
           onPress={() => handleSelectOption(option.id)}
           disabled={isAnswerConfirmed}
         >
-          <Text style={styles.optionText}>{option.optionText}</Text>
+          <Text style={{ color: colors.text, fontSize: 16 }}>{option.optionText}</Text>
         </TouchableOpacity>
       ))}
       
       <View style={styles.footer}>
         {isAnswerConfirmed ? (
-            <TouchableOpacity style={styles.button} onPress={handleNextQuestion}>
-                <Text style={styles.buttonText}>
-                    {/* Muda texto do botão dependendo se é o fim do quiz ou da playlist */}
+            <TouchableOpacity 
+                testID="btn-next" // <--- ID CRÍTICO AQUI
+                style={[styles.button, { backgroundColor: colors.primary }]} 
+                onPress={handleNextQuestion}
+            >
+                <Text style={styles.btnText}>
                     {currentQuestionIndex < quiz.questions.length - 1 
                         ? "Próxima Pergunta" 
                         : (quizIds && currentIndex < quizIds.length - 1 ? "Próximo Quiz >>" : "Ver Resultados")}
@@ -178,11 +155,12 @@ export default function PlayQuizScreen({ route, navigation }) {
             </TouchableOpacity>
         ) : (
             <TouchableOpacity 
-                style={[styles.button, !selectedOption && styles.buttonDisabled]} 
+                testID="btn-confirm" // <--- ID CRÍTICO AQUI
+                style={[styles.button, { backgroundColor: selectedOption ? colors.primary : colors.subText }]} 
                 onPress={handleConfirmAnswer}
                 disabled={!selectedOption}
             >
-                <Text style={styles.buttonText}>Confirmar</Text>
+                <Text style={styles.btnText}>Confirmar Resposta</Text>
             </TouchableOpacity>
         )}
       </View>
@@ -191,27 +169,15 @@ export default function PlayQuizScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: SIZING.padding, backgroundColor: '#fff' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  quizTitle: { ...FONTS.h2, textAlign: 'center', marginBottom: 10, color: COLORS.primary },
+  container: { flexGrow: 1, padding: SIZING.padding },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  quizTitle: { ...FONTS.h2, textAlign: 'center', marginBottom: 10 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  questionCount: { ...FONTS.body, color: '#666' },
-  timerText: { ...FONTS.body, fontWeight: 'bold', color: 'red' },
-  questionText: { ...FONTS.h2, marginBottom: 20, textAlign: 'center' },
-  option: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    marginVertical: 5,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#e9ecef',
-  },
-  optionText: { ...FONTS.body },
-  optionSelected: { borderColor: COLORS.primary, backgroundColor: '#e7f1ff' },
-  optionCorrect: { backgroundColor: '#d4edda', borderColor: '#c3e6cb' },
-  optionIncorrect: { backgroundColor: '#f8d7da', borderColor: '#f5c6cb' },
-  footer: { marginTop: 30 },
-  button: { backgroundColor: COLORS.primary, padding: 15, borderRadius: 8, alignItems: 'center' },
-  buttonDisabled: { backgroundColor: '#ccc' },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  infoText: { fontWeight: 'bold', fontSize: 16 },
+  questionCard: { padding: 25, borderRadius: 16, marginBottom: 25, alignItems: 'center', elevation: 3 },
+  questionText: { ...FONTS.h2, textAlign: 'center' },
+  option: { padding: 18, marginVertical: 6, borderRadius: 12, borderWidth: 1 },
+  footer: { marginTop: 30, marginBottom: 50 },
+  button: { padding: 18, borderRadius: 14, alignItems: 'center', ...Platform.select({web: {cursor: 'pointer'}}) },
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
 });

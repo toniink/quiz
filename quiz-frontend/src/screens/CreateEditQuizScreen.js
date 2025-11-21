@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  View, Text, TextInput, Button, StyleSheet, 
-  ScrollView, Alert, Switch, Platform, TouchableOpacity, ActivityIndicator 
+  View, Text, TextInput, StyleSheet, 
+  ScrollView, Alert, Switch, Platform, TouchableOpacity, 
+  ActivityIndicator, KeyboardAvoidingView 
 } from 'react-native';
-import { COLORS, SIZING, FONTS} from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { SIZING, FONTS } from '../constants/theme';
 import { getQuizDetails, createQuiz, updateQuiz, getAllFolders } from '../services/api';
 
 const newQuestionTemplate = () => ({
@@ -15,6 +17,7 @@ const newQuestionTemplate = () => ({
 });
 
 export default function CreateEditQuizScreen({ route, navigation }) {
+  const { colors } = useTheme(); 
   const { quizId } = route.params || {};
   const isEditMode = !!quizId;
 
@@ -24,6 +27,9 @@ export default function CreateEditQuizScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [allFolders, setAllFolders] = useState([]);
   const [selectedFolderIds, setSelectedFolderIds] = useState([]);
+  
+  // NOVO ESTADO: Texto da pesquisa de pastas
+  const [folderSearch, setFolderSearch] = useState('');
 
   useEffect(() => {
     getAllFolders()
@@ -38,19 +44,22 @@ export default function CreateEditQuizScreen({ route, navigation }) {
           setTitle(quiz.title);
           setTimePerQuestion(quiz.timePerQuestion.toString());
           
-          // Carrega as perguntas e converte isCorrect (0/1) para boolean
           setQuestions(quiz.questions.map(q => ({
             ...q,
             options: q.options.map(o => ({ ...o, isCorrect: !!o.isCorrect }))
           })));
           
-          // Carrega as pastas já selecionadas
           setSelectedFolderIds(quiz.folderIds || []); 
         })
         .catch(err => Alert.alert("Erro", "Não foi possível carregar."))
         .finally(() => setLoading(false));
     }
   }, [quizId, isEditMode]);
+
+  // Filtra as pastas baseado na pesquisa (Case Insensitive)
+  const filteredFolders = allFolders.filter(f => 
+    f.name.toLowerCase().includes(folderSearch.toLowerCase())
+  );
 
   const handleQuestionChange = (text, qIndex) => {
     const newQuestions = [...questions];
@@ -74,6 +83,13 @@ export default function CreateEditQuizScreen({ route, navigation }) {
 
   const addQuestion = () => {
     setQuestions([...questions, newQuestionTemplate()]);
+  };
+
+  const removeQuestion = (index) => {
+      if (questions.length === 1) return;
+      const newQ = [...questions];
+      newQ.splice(index, 1);
+      setQuestions(newQ);
   };
 
   const addOption = (qIndex) => {
@@ -111,18 +127,15 @@ export default function CreateEditQuizScreen({ route, navigation }) {
     
     setLoading(true);
     
-    // === CORREÇÃO AQUI ===
     const quizData = {
       title,
       timePerQuestion: parseInt(timePerQuestion) || 0,
-      // folderIds DEVE estar na raiz do objeto, não dentro de questions
       folderIds: selectedFolderIds, 
       questions: questions.map(q => ({
         ...q,
         options: q.options.map(o => ({ ...o, isCorrect: o.isCorrect ? 1 : 0 }))
       }))
     };
-    // =====================
 
     try {
       if (isEditMode) {
@@ -140,101 +153,209 @@ export default function CreateEditQuizScreen({ route, navigation }) {
     }
   };
 
-  if (loading && isEditMode) return <View><Text>Carregando...</Text></View>;
+  if (loading && isEditMode) {
+      return (
+          <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{color: colors.text, marginTop: 10}}>Carregando Quiz...</Text>
+          </View>
+      );
+  }
+
+  const cardStyle = [styles.card, { backgroundColor: colors.card, borderColor: colors.border }];
+  const labelStyle = [styles.label, { color: colors.text, marginBottom: 0 }]; // Removi margem inferior pois ajustarei no layout
+  const subLabelStyle = [styles.label, { color: colors.subText, fontSize: 14 }];
+  
+  const inputStyle = [
+      styles.input, 
+      { 
+          backgroundColor: colors.inputBg, 
+          color: colors.text, 
+          borderColor: colors.border 
+      }
+  ];
+
+  const folderBoxStyle = {
+      backgroundColor: colors.inputBg,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      maxHeight: 150,
+      padding: 5,
+      marginTop: 10
+  };
 
   return (
-    <View style={styles.safeArea}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
-        <Text style={styles.label}>Título do Quiz</Text>
-        <TextInput 
-          testID="quiz-title" 
-          style={styles.input} 
-          value={title} 
-          onChangeText={setTitle} 
-        />
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* --- DADOS GERAIS --- */}
+          <View style={cardStyle}>
+              <Text style={[labelStyle, {marginBottom: 8}]}>Título do Quiz</Text>
+              <TextInput 
+                testID="quiz-title" 
+                style={inputStyle} 
+                value={title} 
+                onChangeText={setTitle} 
+                placeholder="Ex: Matemática Básica"
+                placeholderTextColor={colors.subText}
+              />
 
-        <Text style={styles.label}>Tempo por Pergunta (s)</Text>
-        <TextInput  
-          testID="quiz-time" 
-          style={styles.input} 
-          value={timePerQuestion} 
-          onChangeText={setTimePerQuestion} 
-          keyboardType="numeric" 
-        />
+              <Text style={[labelStyle, {marginBottom: 8}]}>Tempo por Pergunta (s)</Text>
+              <TextInput  
+                testID="quiz-time" 
+                style={inputStyle} 
+                value={timePerQuestion} 
+                onChangeText={setTimePerQuestion} 
+                keyboardType="numeric" 
+                placeholder="0 = Sem tempo"
+                placeholderTextColor={colors.subText}
+              />
+          </View>
 
-        <Text style={styles.label}>Adicionar às Pastas:</Text>
-        <View style={styles.folderContainer}>
-          {allFolders.length === 0 ? (
-             <Text style={{color: '#888', padding: 10}}>Nenhuma pasta criada. Crie pastas no Dashboard.</Text>
-          ) : (
-            allFolders.map(folder => (
-                <View key={folder.id} style={styles.optionContainer}>
-                  <Text style={{flex: 1, ...FONTS.body}}>{folder.name}</Text>
+          {/* --- SELEÇÃO DE PASTAS (COM PESQUISA) --- */}
+          <View style={cardStyle}>
+              {/* HEADER DA SECÇÃO COM PESQUISA LADO A LADO */}
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <Text style={labelStyle}>Adicionar às Pastas:</Text>
+                  
+                  {/* Input de Pesquisa Pequeno */}
+                  <TextInput 
+                    style={[
+                        inputStyle, 
+                        { 
+                            width: '45%', 
+                            marginBottom: 0, 
+                            paddingVertical: 4, 
+                            paddingHorizontal: 10,
+                            fontSize: 14,
+                            height: 35
+                        }
+                    ]}
+                    placeholder="🔍 Buscar pasta..."
+                    placeholderTextColor={colors.subText}
+                    value={folderSearch}
+                    onChangeText={setFolderSearch}
+                  />
+              </View>
+              
+              {allFolders.length === 0 ? (
+                 <Text style={{color: colors.subText, padding: 10, fontStyle: 'italic', marginTop: 10}}>
+                    Nenhuma pasta criada.
+                 </Text>
+              ) : (
+                <View style={folderBoxStyle}> 
+                  <ScrollView 
+                    nestedScrollEnabled={true}
+                    persistentScrollbar={true}
+                    showsVerticalScrollIndicator={true}
+                    indicatorStyle={colors.text === '#ffffff' ? 'white' : 'black'}
+                  >
+                    {filteredFolders.length === 0 ? (
+                        <Text style={{color: colors.subText, padding: 10, fontSize: 12}}>Nenhuma pasta encontrada.</Text>
+                    ) : (
+                        filteredFolders.map(folder => (
+                            <View key={folder.id} style={styles.optionRow}>
+                            <Text style={{flex: 1, ...FONTS.body, color: colors.text, paddingLeft: 5}}>{folder.name}</Text>
+                            <Switch
+                                value={selectedFolderIds.includes(folder.id)}
+                                onValueChange={() => toggleFolderSelection(folder.id)}
+                                trackColor={{ false: "#767577", true: colors.primary }}
+                                thumbColor={"#f4f3f4"}
+                            />
+                            </View>
+                        ))
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+          </View>
+
+          {/* --- PERGUNTAS --- */}
+          {questions.map((q, qIndex) => (
+            <View key={qIndex} style={[cardStyle, { borderLeftWidth: 4, borderLeftColor: colors.primary }]}>
+              
+              <View style={styles.questionHeader}>
+                  <Text style={labelStyle}>Pergunta {qIndex + 1}</Text>
+                  {questions.length > 1 && (
+                      <TouchableOpacity onPress={() => removeQuestion(qIndex)}>
+                          <Text style={{color: colors.danger, fontWeight: 'bold'}}>Excluir</Text>
+                      </TouchableOpacity>
+                  )}
+              </View>
+
+              <TextInput
+                style={inputStyle}
+                placeholder="Enunciado da pergunta..."
+                placeholderTextColor={colors.subText}
+                value={q.questionText}
+                onChangeText={(text) => handleQuestionChange(text, qIndex)}
+                multiline
+              />
+        
+              <Text style={[subLabelStyle, {marginTop: 10, marginBottom: 5}]}>Alternativas (Marque a correta):</Text>
+              
+              {q.options.map((o, oIndex) => (
+                <View key={oIndex} style={styles.optionRow}>
                   <Switch
-                    value={selectedFolderIds.includes(folder.id)}
-                    onValueChange={() => toggleFolderSelection(folder.id)}
-                    // Cores para facilitar visualização
-                    trackColor={{ false: "#767577", true: "#81b0ff" }}
-                    thumbColor={selectedFolderIds.includes(folder.id) ? "#007bff" : "#f4f3f4"}
+                    value={o.isCorrect}
+                    onValueChange={() => handleSetCorrect(qIndex, oIndex)}
+                    trackColor={{ false: "#767577", true: colors.success }}
+                  />
+                  <TextInput
+                    style={[inputStyle, {flex: 1, marginLeft: 10, marginBottom: 0}]}
+                    placeholder={`Opção ${oIndex + 1}`}
+                    placeholderTextColor={colors.subText}
+                    value={o.optionText}
+                    onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
                   />
                 </View>
-            ))
-          )}
-        </View>
+              ))}
 
-        {questions.map((q, qIndex) => (
-          <View key={qIndex} style={styles.questionBox}>
-            <Text style={styles.label}>Pergunta {qIndex + 1}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Texto da pergunta"
-              value={q.questionText}
-              onChangeText={(text) => handleQuestionChange(text, qIndex)}
-            />
-      
-            <Text style={styles.label}>Alternativas:</Text>
-            {q.options.map((o, oIndex) => (
-              <View key={oIndex} style={styles.optionContainer}>
-                <TextInput
-                  style={styles.optionInput}
-                  placeholder={`Alternativa ${oIndex + 1}`}
-                  value={o.optionText}
-                  onChangeText={(text) => handleOptionChange(text, qIndex, oIndex)}
-                />
-                <Text style={{marginRight: 5}}>Correta?</Text>
-                <Switch
-                  value={o.isCorrect}
-                  onValueChange={() => handleSetCorrect(qIndex, oIndex)}
-                />
-              </View>
-            ))}
-            <Button title="Adicionar Alternativa" onPress={() => addOption(qIndex)} />
-          </View>
-        ))}
-        
-        <View style={{marginBottom: 10}}>
-           <Button title="Adicionar Pergunta" onPress={addQuestion} />
-        </View>
+              <TouchableOpacity 
+                  style={{marginTop: 15, alignSelf: 'flex-start'}} 
+                  onPress={() => addOption(qIndex)}
+              >
+                  <Text style={{color: colors.primary, fontWeight: 'bold'}}>+ Adicionar Alternativa</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          
+          <TouchableOpacity 
+              onPress={addQuestion} 
+              style={[styles.dashedButton, { borderColor: colors.primary }]}
+          >
+             <Text style={{color: colors.primary, fontWeight: 'bold', fontSize: 16}}>+ NOVA PERGUNTA</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[styles.saveButton, (!isFormValid() || loading) && styles.disabledButton]}
-          disabled={!isFormValid() || loading}
-        >
-           {loading ? (
-             <ActivityIndicator color="#fff" />
-           ) : (
-             <Text style={styles.saveButtonText}>
-               {isEditMode ? "Atualizar Quiz" : "Salvar Quiz"}
-             </Text>
-           )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSave}
+            style={[
+                styles.saveButton, 
+                { backgroundColor: (!isFormValid() || loading) ? colors.subText : colors.primary }
+            ]}
+            disabled={!isFormValid() || loading}
+          >
+             {loading ? (
+               <ActivityIndicator color="#fff" />
+             ) : (
+               <Text style={styles.saveButtonText}>
+                 {isEditMode ? "ATUALIZAR QUIZ" : "SALVAR QUIZ"}
+               </Text>
+             )}
+          </TouchableOpacity>
 
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -242,43 +363,67 @@ export default function CreateEditQuizScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.lightGray,
     ...Platform.select({
       web: { height: '100vh' }
     })
   },
+  loadingContainer: {
+      flex: 1, justifyContent: 'center', alignItems: 'center'
+  },
+  scrollView: { flex: 1 },
   scrollContent: {
     padding: SIZING.padding, 
     paddingBottom: 100,
   },
-  label: { fontSize: 16, fontWeight: 'bold', marginTop: 10 },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 8, borderRadius: 5, marginBottom: 10 },
-  questionBox: { borderWidth: 1, borderColor: '#007bff', padding: 10, borderRadius: 5, marginVertical: 10 },
-  optionContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 5 },
-  optionInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', padding: 5, marginRight: 10 },
-  folderContainer: {
-    backgroundColor: 'white',
-    borderColor: '#ccc',
+  card: {
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
     borderWidth: 1,
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 10,
+    ...Platform.select({
+        web: { boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+        default: { elevation: 2 }
+    })
+  },
+  label: { 
+      fontSize: 16, fontWeight: 'bold'
+  },
+  input: { 
+      borderWidth: 1, 
+      borderRadius: 8, 
+      padding: 12, 
+      marginBottom: 15, 
+      fontSize: 16 
+  },
+  questionHeader: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10
+  },
+  optionRow: { 
+      flexDirection: 'row', alignItems: 'center', marginBottom: 10, paddingVertical: 2
+  },
+  dashedButton: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderRadius: 12,
+      padding: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+      backgroundColor: 'transparent'
   },
   saveButton: {
-    backgroundColor: COLORS.primary || '#007bff',
-    padding: 15,
-    borderRadius: 5,
+    padding: 18,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
-    cursor: 'pointer'
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed'
+    marginBottom: 50,
+    ...Platform.select({
+        web: { cursor: 'pointer' }
+    })
   },
   saveButtonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 16,
+    letterSpacing: 1
   }
 });

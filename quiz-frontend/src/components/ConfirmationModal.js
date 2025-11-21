@@ -1,7 +1,7 @@
-// src/components/ConfirmationModal.js
 import React from 'react';
-import { Modal, View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING, FONTS } from '../constants/theme';
+import { Modal, View, Text, StyleSheet, Platform } from 'react-native';
+import { useTheme } from '../context/ThemeContext'; // Importa o hook do tema
+import { SIZING, FONTS } from '../constants/theme';
 import StyledButton from './StyledButton';
 
 export default function ConfirmationModal({
@@ -12,34 +12,49 @@ export default function ConfirmationModal({
   onConfirm,
   cancelText = "Cancelar",
   confirmText = "Confirmar",
-  confirmColor = "primary", // Pode ser 'primary' ou 'danger'
+  confirmColor = "primary",
 }) {
+  const { colors } = useTheme(); // Obtém as cores dinâmicas (Dark/Light)
+
   return (
     <Modal
       transparent={true}
       visible={visible}
       animationType="fade"
-      onRequestClose={onCancel} // Permite fechar com o botão "voltar" no Android
+      onRequestClose={onCancel}
     >
       {/* Fundo Escuro (Overlay) */}
       <View style={styles.centeredView}>
-        {/* Caixa Branca do Modal */}
-        <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <Text style={styles.modalMessage}>{message}</Text>
+        
+        {/* Caixa do Modal (Estilizada dinamicamente) */}
+        <View style={[
+            styles.modalView, 
+            { 
+              backgroundColor: colors.card, 
+              shadowColor: colors.border 
+            }
+        ]}>
+          
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {title}
+          </Text>
+          
+          <Text style={[styles.modalMessage, { color: colors.subText }]}>
+            {message}
+          </Text>
 
           <View style={styles.buttonRow}>
-            {/* Botão Cancelar */}
             <StyledButton
               title={cancelText}
               color="secondary"
               onPress={onCancel}
+              style={{flex: 1, marginRight: 10}}
             />
-            {/* Botão Confirmar */}
             <StyledButton
               title={confirmText}
               color={confirmColor}
               onPress={onConfirm}
+              style={{flex: 1}}
             />
           </View>
         </View>
@@ -53,37 +68,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Overlay semi-transparente
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Overlay mais escuro para contraste
   },
   modalView: {
     margin: SIZING.margin,
-    backgroundColor: COLORS.white,
-    borderRadius: SIZING.radius * 2,
-    padding: SIZING.padding * 1.5,
+    borderRadius: SIZING.radius * 1.5, // Bordas mais arredondadas
+    padding: 25,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: '90%', // Responsivo
-    maxWidth: 400, // Limite para web
+    width: '85%',
+    maxWidth: 400,
+    // Sombra adaptativa
+    ...Platform.select({
+        web: { boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
+        default: { elevation: 10 }
+    })
   },
   modalTitle: {
     ...FONTS.h2,
-    color: COLORS.text,
-    marginBottom: SIZING.margin,
+    marginBottom: 10,
     textAlign: 'center',
+    fontSize: 20
   },
   modalMessage: {
     ...FONTS.body,
-    color: COLORS.secondary,
-    marginBottom: SIZING.margin * 1.5,
+    marginBottom: 25,
     textAlign: 'center',
+    lineHeight: 22
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around', // Espaça os botões
+    justifyContent: 'space-between',
     width: '100%',
   },
 });

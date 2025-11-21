@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, FlatList, StyleSheet, SafeAreaView, Platform, 
-  TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput,
-  KeyboardAvoidingView // Importante para o teclado não cobrir o modal no Android
+  TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, 
+  KeyboardAvoidingView 
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getAllFolders, deleteFoldersBulk, createFolder, getFolderDetails } from '../services/api';
-import { COLORS, SIZING, FONTS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext'; // Hook do Tema
+import { SIZING, FONTS } from '../constants/theme';
 import StyledButton from '../components/StyledButton';
 
 export default function FoldersListScreen({ navigation }) {
+  const { colors } = useTheme(); // Cores dinâmicas (Dark/Light)
+  
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Seleção Múltipla
+  // Estados de Seleção (Bulk Action)
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Modal de Criação (Universal)
+  // Estados do Modal de Criação
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
@@ -38,10 +41,10 @@ export default function FoldersListScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  // --- CRIAÇÃO DE PASTA (MODAL PARA TODOS) ---
+  // --- LÓGICA DE CRIAÇÃO (MODAL) ---
   const handleCreatePress = () => {
     setNewFolderName(''); 
-    setCreateModalVisible(true); // Abre o modal no Android e Web
+    setCreateModalVisible(true);
   };
 
   const confirmCreateFolder = async () => {
@@ -59,7 +62,7 @@ export default function FoldersListScreen({ navigation }) {
       }
   };
 
-  // --- SELEÇÃO ---
+  // --- LÓGICA DE SELEÇÃO ---
   const toggleSelection = (id) => {
       setSelectedIds(prev => 
           prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -71,7 +74,6 @@ export default function FoldersListScreen({ navigation }) {
       setSelectedIds([]);
   };
 
-  // --- DELEÇÃO EM MASSA ---
   const handleBulkDelete = () => {
       if (selectedIds.length === 0) return;
       
@@ -91,7 +93,6 @@ export default function FoldersListScreen({ navigation }) {
           }
       };
 
-      // Lógica específica para confirmação (Alert nativo vs Window.confirm)
       if (Platform.OS === 'web') {
           if (window.confirm(confirmText)) execute();
       } else {
@@ -102,7 +103,7 @@ export default function FoldersListScreen({ navigation }) {
       }
   };
 
-  // --- JOGAR PASTA DIRETO ---
+  // --- LÓGICA DE JOGAR PASTA ---
   const handlePlayFolder = async (folderId) => {
       try {
           setLoading(true);
@@ -122,12 +123,18 @@ export default function FoldersListScreen({ navigation }) {
       }
   };
 
+  // --- RENDERIZAÇÃO DO ITEM ---
   const renderItem = ({ item }) => {
       const isSelected = selectedIds.includes(item.id);
 
       return (
           <TouchableOpacity 
-            style={[styles.card, isSelected && styles.cardSelected]}
+            testID={`folder-${item.name}`} // ID para o Selenium
+            style={[
+                styles.card, 
+                { backgroundColor: colors.card, borderColor: colors.border },
+                isSelected && { backgroundColor: colors.inputBg, borderColor: colors.primary, borderWidth: 1 }
+            ]}
             onPress={() => {
                 if (selectionMode) toggleSelection(item.id);
                 else navigation.navigate('Folder', { folderId: item.id });
@@ -135,20 +142,27 @@ export default function FoldersListScreen({ navigation }) {
             activeOpacity={0.7}
           >
               <View style={styles.cardContent}>
+                  {/* Checkbox Visual */}
                   {selectionMode && (
-                    <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                    <View style={[
+                        styles.checkbox, 
+                        { borderColor: colors.subText }, 
+                        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}>
                         {isSelected && <Text style={{color:'white', fontWeight: 'bold'}}>✓</Text>}
                     </View>
                   )}
-                  <Text style={styles.folderName}>📂 {item.name}</Text>
+                  
+                  <Text style={[styles.folderName, { color: colors.text }]}>📂 {item.name}</Text>
               </View>
 
+              {/* Botão Jogar (Só se não estiver selecionando) */}
               {!selectionMode && (
                   <TouchableOpacity 
-                    style={styles.playButton}
+                    style={[styles.playButton, { backgroundColor: colors.inputBg }]}
                     onPress={() => handlePlayFolder(item.id)}
                   >
-                      <Text style={styles.playButtonText}>▶ Jogar</Text>
+                      <Text style={[styles.playButtonText, { color: colors.primary }]}>▶ Jogar</Text>
                   </TouchableOpacity>
               )}
           </TouchableOpacity>
@@ -158,33 +172,47 @@ export default function FoldersListScreen({ navigation }) {
   const Container = Platform.OS === 'web' ? View : SafeAreaView;
 
   return (
-    <Container style={styles.container}>
+    <Container style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* CABEÇALHO */}
         <View style={styles.header}>
-            <StyledButton title="+ Nova Pasta" onPress={handleCreatePress} />
-            <TouchableOpacity onPress={toggleMode}>
-                <Text style={styles.manageText}>{selectionMode ? "Cancelar" : "Selecionar Vários"}</Text>
+            <StyledButton 
+                testID="btn-new-folder" // ID para Selenium
+                title="+ Nova Pasta" 
+                onPress={handleCreatePress} 
+                color="primary" 
+            />
+            <TouchableOpacity 
+                testID="btn-manage-folders-toggle"
+                onPress={toggleMode}
+            >
+                <Text style={[styles.manageText, { color: colors.primary }]}>
+                    {selectionMode ? "Cancelar" : "Selecionar Vários"}
+                </Text>
             </TouchableOpacity>
         </View>
 
+        {/* BARRA DE AÇÃO EM MASSA */}
         {selectionMode && (
-            <View style={styles.bulkHeader}>
-                <Text style={{color: 'white'}}>{selectedIds.length} selecionados</Text>
+            <View style={[styles.bulkHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={{color: colors.text}}>{selectedIds.length} selecionados</Text>
                 {selectedIds.length > 0 && (
                     <TouchableOpacity onPress={handleBulkDelete}>
-                        <Text style={{color: '#ff6b6b', fontWeight: 'bold'}}>APAGAR SELECIONADOS</Text>
+                        <Text style={{color: colors.danger, fontWeight: 'bold'}}>APAGAR SELECIONADOS</Text>
                     </TouchableOpacity>
                 )}
             </View>
         )}
 
-        {loading && <ActivityIndicator size="large" color={COLORS.primary} />}
+        {loading && <ActivityIndicator size="large" color={colors.primary} />}
 
         <FlatList 
             data={folders}
             renderItem={renderItem}
             keyExtractor={item => item.id.toString()}
             contentContainerStyle={{paddingBottom: 20}}
-            ListEmptyComponent={<Text style={styles.empty}>Nenhuma pasta criada.</Text>}
+            ListEmptyComponent={
+                <Text style={[styles.empty, { color: colors.subText }]}>Nenhuma pasta criada.</Text>
+            }
         />
 
         {/* --- MODAL DE CRIAR PASTA (UNIVERSAL) --- */}
@@ -198,27 +226,37 @@ export default function FoldersListScreen({ navigation }) {
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 style={styles.modalOverlay}
             >
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Nova Pasta</Text>
+                <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>Nova Pasta</Text>
                     
                     <TextInput 
-                        style={styles.modalInput}
+                        testID="input-folder-name" // ID para Selenium
+                        style={[
+                            styles.modalInput, 
+                            { 
+                                backgroundColor: colors.inputBg, 
+                                color: colors.text, 
+                                borderColor: colors.border 
+                            }
+                        ]}
                         placeholder="Nome da pasta (ex: História)"
+                        placeholderTextColor={colors.subText}
                         value={newFolderName}
                         onChangeText={setNewFolderName}
-                        autoFocus={true} // Foca automaticamente ao abrir
+                        autoFocus={true}
                     />
                     
                     <View style={styles.modalButtons}>
                         <TouchableOpacity 
-                            style={[styles.modalButton, {backgroundColor: '#ccc'}]}
+                            style={[styles.modalButton, {backgroundColor: colors.subText}]}
                             onPress={() => setCreateModalVisible(false)}
                         >
                             <Text style={styles.modalButtonText}>Cancelar</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity 
-                            style={[styles.modalButton, {backgroundColor: COLORS.primary}]}
+                            testID="btn-confirm-create-folder" // ID para Selenium
+                            style={[styles.modalButton, {backgroundColor: colors.primary}]}
                             onPress={confirmCreateFolder}
                         >
                             <Text style={[styles.modalButtonText, {color: 'white'}]}>Criar</Text>
@@ -233,65 +271,49 @@ export default function FoldersListScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.lightGray, padding: SIZING.padding },
+    container: { flex: 1, padding: SIZING.padding },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-    manageText: { color: COLORS.primary, fontWeight: 'bold' },
+    manageText: { fontWeight: 'bold', fontSize: 16 },
     
     bulkHeader: { 
-        backgroundColor: '#333', padding: 10, borderRadius: 8, marginBottom: 10,
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+        padding: 10, borderRadius: 8, marginBottom: 10, 
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        borderWidth: 1 
     },
 
     card: {
-        backgroundColor: 'white', padding: 20, borderRadius: 10, marginBottom: 10,
+        padding: 20, borderRadius: 10, marginBottom: 10,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        ...Platform.select({ 
-            web: { boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
-            default: { elevation: 2 }
-        })
-    },
-    cardSelected: {
-        backgroundColor: '#e3f2fd', borderColor: COLORS.primary, borderWidth: 1
+        borderWidth: 1,
+        ...Platform.select({ web: { boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }, default: { elevation: 2 } })
     },
     cardContent: { flexDirection: 'row', alignItems: 'center' },
-    folderName: { fontSize: 18, fontWeight: '600', color: '#333', marginLeft: 10 },
+    folderName: { fontSize: 18, fontWeight: '600', marginLeft: 10 },
     
     checkbox: {
-        width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#ccc', marginRight: 10,
+        width: 20, height: 20, borderRadius: 4, borderWidth: 2, marginRight: 10,
         alignItems: 'center', justifyContent: 'center'
     },
-    checkboxChecked: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
 
     playButton: {
-        backgroundColor: '#e9ecef', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20
+        paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20
     },
-    playButtonText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 12 },
+    playButtonText: { fontWeight: 'bold', fontSize: 12 },
     
-    empty: { textAlign: 'center', color: '#999', marginTop: 50 },
+    empty: { textAlign: 'center', marginTop: 50, fontSize: 16 },
 
-    // --- ESTILOS DO MODAL ---
+    // Modal Styles
     modalOverlay: {
-        flex: 1, 
-        backgroundColor: 'rgba(0,0,0,0.5)', 
-        justifyContent: 'center', 
-        alignItems: 'center'
+        flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center'
     },
     modalContent: {
-        backgroundColor: 'white', 
-        padding: 25, 
-        borderRadius: 15, 
-        width: '85%', 
-        maxWidth: 400,
+        padding: 25, borderRadius: 15, width: '85%', maxWidth: 400,
         elevation: 5,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84,
     },
-    modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
+    modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     modalInput: {
-        borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 20, fontSize: 16,
-        backgroundColor: '#f9f9f9'
+        borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 20, fontSize: 16
     },
     modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
     modalButton: {

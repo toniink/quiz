@@ -1,36 +1,54 @@
-// src/components/StyledButton.js
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING, FONTS } from '../constants/theme';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { SIZING, FONTS } from '../constants/theme';
 
-export default function StyledButton({ title, onPress, color = 'primary', disabled }) {
+// Adicionei '...props' no final para capturar o testID
+export default function StyledButton({ title, onPress, color = 'primary', disabled, style, loading, ...props }) {
+  const { colors } = useTheme();
+
+  const backgroundColor = colors[color] || colors.primary;
+
   const buttonStyle = [
     styles.button,
-    { backgroundColor: COLORS[color] || COLORS.primary },
-    disabled && styles.disabled,
+    { backgroundColor: disabled ? colors.subText : backgroundColor },
+    Platform.select({
+        web: { boxShadow: disabled ? 'none' : '0 2px 5px rgba(0,0,0,0.2)' },
+        default: { elevation: disabled ? 0 : 3 }
+    }),
+    style,
   ];
 
   return (
-    <TouchableOpacity style={buttonStyle} onPress={onPress} disabled={disabled}>
-      <Text style={styles.text}>{title}</Text>
+    <TouchableOpacity 
+      style={buttonStyle} 
+      onPress={onPress} 
+      disabled={disabled || loading}
+      activeOpacity={0.8}
+      {...props} // <--- ISTO É O SEGREDO: Repassa o testID para o elemento real
+    >
+      {loading ? (
+        <ActivityIndicator color={colors.white} />
+      ) : (
+        <Text style={[styles.text, { color: colors.white }]}>{title}</Text>
+      )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    padding: SIZING.padding * 0.75,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: SIZING.radius,
     alignItems: 'center',
-    marginVertical: SIZING.margin / 2,
+    justifyContent: 'center',
+    marginVertical: 5,
   },
   text: {
-    color: COLORS.white,
     ...FONTS.body,
     fontWeight: 'bold',
-  },
-  disabled: {
-    backgroundColor: COLORS.secondary,
-    opacity: 0.7,
+    fontSize: 16,
+    letterSpacing: 0.5
   },
 });

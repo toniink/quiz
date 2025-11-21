@@ -1,81 +1,106 @@
-// src/navigation/AppNavigator.js
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useTheme } from '../context/ThemeContext'; // Importa o hook do tema
 
 // Telas de Autenticação
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 
-// Telas Principais (Novas)
-import DashboardScreen from '../screens/DashboardScreen'; // Tela principal pós-login
-import CreateEditQuizScreen from '../screens/CreateEditQuizScreen'; // Formulário
-import PlayQuizScreen from '../screens/PlayQuizScreen'; // O jogo
-import ResultsScreen from '../screens/ResultsScreen'; // Placar final
+
+// Telas Principais
+import DashboardScreen from '../screens/DashboardScreen';
+import CreateEditQuizScreen from '../screens/CreateEditQuizScreen';
+import PlayQuizScreen from '../screens/PlayQuizScreen';
+import ResultsScreen from '../screens/ResultsScreen';
 import FolderScreen from '../screens/FolderScreen';
 import FoldersListScreen from '../screens/FoldersListScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import HelpScreen from '../screens/HelpScreen';
 
 const Stack = createStackNavigator();
 
-// Contexto ou Zustand/Redux seria usado aqui para gerenciar o 'isLoggedIn'
-// Por simplicidade, vamos fingir que o usuário NUNCA está logado
-// Em um app real, você teria uma lógica de estado para trocar entre os Stacks
-
-// Stack de Autenticação
+// Stack para utilizadores não logados
 function AuthStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen 
-        name="Login" 
-        component={LoginScreen} 
-        options={{ headerShown: false }} 
-      />
-      <Stack.Screen 
-        name="Register" 
-        component={RegisterScreen} 
-        options={{ title: 'Criar Conta' }} 
-      />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
   );
 }
 
-// Stack Principal (dentro do App)
+// Stack para utilizadores logados (Aplicação Principal)
 function MainStack() {
+  // Usamos o hook para pegar as cores atuais (Dark/Light)
+  const { colors } = useTheme();
+
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        // Estilo do Header Dinâmico
+        headerStyle: {
+          backgroundColor: colors.card,
+          elevation: 0, // Remove sombra no Android (opcional, fica mais limpo)
+          shadowOpacity: 0, // Remove sombra no iOS
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border
+        },
+        headerTintColor: colors.text, // Cor do texto do título e botões de voltar
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        // Define a cor de fundo das telas por defeito
+        cardStyle: { backgroundColor: colors.background }
+      }}
+    >
       <Stack.Screen 
         name="Dashboard" 
         component={DashboardScreen} 
-        options={{ title: 'Meus Quizzes' }} 
+        options={{ headerShown: false }} // O Dashboard tem seu próprio header customizado
       />
+      
       <Stack.Screen 
         name="FoldersList" 
         component={FoldersListScreen} 
         options={{ title: 'Minhas Pastas' }} 
       />
       <Stack.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
+        options={{ title: 'Meu Perfil' }} 
+      />
+      <Stack.Screen 
         name="Folder" 
         component={FolderScreen} 
-        // O título será definido dinamicamente pela tela
+        options={{ title: 'Pasta' }}
       />
+      
       <Stack.Screen 
         name="CreateEditQuiz" 
         component={CreateEditQuizScreen} 
-        options={{ title: 'Criar Quiz' }} 
+        options={{ title: 'Editor de Quiz' }} 
       />
+      
       <Stack.Screen 
         name="PlayQuiz" 
         component={PlayQuizScreen} 
         options={{ title: 'Jogar' }} 
       />
+      
       <Stack.Screen 
         name="Results" 
         component={ResultsScreen} 
-        options={{ title: 'Resultados' }} 
+        options={{ title: 'Resultados', headerShown: false }} 
       />
+    <Stack.Screen 
+        name="Help" 
+        component={HelpScreen} 
+        options={{ title: 'Ajuda & Suporte' }} 
+      />
+
     </Stack.Navigator>
+    
   );
 }
 
-// No App.js, você decidiria qual Stack mostrar.
-// Por enquanto, vamos apenas exportar os dois
 export { AuthStack, MainStack };
