@@ -3,31 +3,33 @@ import string
 from locust import HttpUser, task, between
 
 class QuizUser(HttpUser):
-    # Tempo de espera entre uma tarefa e outra (simula o "pensar" do humano)
-    # Aqui o usuário espera entre 1 e 5 segundos entre cliques
+    # Tempo de espera entre tarefas (simula o tempo de leitura/clique do usuário)
+    # O usuário espera entre 1 e 5 segundos antes de fazer a próxima ação
     wait_time = between(1, 5)
     
     token = None
 
     def on_start(self):
         """
-        Executado quando um usuário virtual 'nasce'.
-        Vamos registrar um usuário único e fazer login para pegar o Token.
+        Executado quando um usuário virtual inicia.
+        Registra um usuário único e faz login para obter o Token JWT.
         """
-        # Gera um email aleatório para não colidir no banco de dados
+        # Gera string aleatória para evitar erro de email duplicado
         random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
         email = f"user_{random_id}@teste.com"
         password = "123"
         username = f"User {random_id}"
 
-        # 1. Tenta Registrar
-        self.client.post("/register", json={
+        # 1. Registrar Usuário
+        with self.client.post("/register", json={
             "username": username,
             "email": email,
             "password": password
-        })
+        }, catch_response=True) as response:
+            if response.status_code != 201:
+                response.failure(f"Falha no registro: {response.text}")
 
-        # 2. Faz Login para pegar o Token
+        # 2. Fazer Login
         response = self.client.post("/login", json={
             "email": email,
             "password": password
@@ -38,39 +40,48 @@ class QuizUser(HttpUser):
         else:
             print(f"Erro ao logar: {response.text}")
 
-    @task(3) # Peso 3: É 3x mais provável de acontecer que a tarefa de peso 1
-    def ver_dashboard(self):
+    # ---------------------------------------------------------
+    # TAREFAS (CENÁRIO 70/30)
+    # ---------------------------------------------------------
+
+    @task(7) # Peso 7 (70% de chance)
+    def ler_dashboard(self):
         """
-        Simula o usuário carregando a tela inicial.
+        Simula a leitura do Dashboard (GET).
+        Cenário de alta frequência de leitura.
         """
         if not self.token: return
         
         headers = {"Authorization": f"Bearer {self.token}"}
-        self.client.get("/dashboard", headers=headers)
+        
+        # Agrupamos a requisição com nome "Dashboard" para o relatório ficar limpo
+        self.client.get("/dashboard", headers=headers, name="Leitura Dashboard")
 
-    @task(1) # Peso 1: Acontece com menos frequência
+    @task(3) # Peso 3 (30% de chance)
     def criar_quiz(self):
         """
-        Simula o usuário criando um quiz.
+        Simula a criação de um Quiz (POST).
+        Cenário de escrita no banco de dados.
         """
         if not self.token: return
 
         headers = {"Authorization": f"Bearer {self.token}"}
         
-        # Dados do Quiz fake
+        # Payload do Quiz
         payload = {
             "title": "Quiz de Carga Locust",
             "timePerQuestion": 30,
-            "folderIds": [], # Opcional: coloque IDs reais se tiver certeza que existem
+            "folderIds": [], 
             "questions": [
                 {
-                    "questionText": "O Locust é rápido?",
+                    "questionText": "Teste de carga é importante?",
                     "options": [
                         {"optionText": "Sim", "isCorrect": True},
-                        {"optionText": "Não", "isCorrect": False}
+                        {"optionText": "Com certeza", "isCorrect": False}
                     ]
                 }
             ]
         }
 
-        self.client.post("/quizzes", json=payload, headers=headers)
+        # Agrupamos com nome "Criar Quiz"
+        self.client.post("/quizzes", json=payload, headers=headers, name="Escrita Criar Quiz")
