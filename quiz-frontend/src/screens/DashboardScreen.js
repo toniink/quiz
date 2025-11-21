@@ -46,7 +46,7 @@ const DashboardHeader = ({
       <View style={styles.actionsContainer}>
         {/* BOTÃO CRIAR QUIZ */}
         <TouchableOpacity 
-            testID="btn-create-quiz" // ID CRÍTICO PARA O TESTE (Faltava este)
+            testID="btn-create-quiz" // ID CRÍTICO PARA O TESTE
             style={[styles.bigCreateButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('CreateEditQuiz')}
             activeOpacity={0.8}
@@ -65,18 +65,20 @@ const DashboardHeader = ({
         </TouchableOpacity>
       </View>
 
-      {/* BARRA DE PESQUISA */}
+      {/* BARRA DE PESQUISA COMPACTA AO LADO DO TÍTULO */}
       <View style={styles.listHeaderContainer}>
          <Text style={[styles.sectionTitle, { color: colors.text }]}>Todos os Quizzes</Text>
+         
          <View style={[styles.searchWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={{marginRight: 5}}>🔍</Text>
             <TextInput 
+                testID="input-search-dashboard"
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Pesquisar quiz..."
+                placeholder="Pesquisar..."
                 placeholderTextColor={colors.subText}
                 value={searchText}
                 onChangeText={(t) => { setSearchText(t); setCurrentPage(1); }}
             />
+            <Text style={{marginLeft: 5, fontSize: 12}}>🔍</Text>
          </View>
       </View>
     </View>
@@ -159,6 +161,7 @@ export default function DashboardScreen({ navigation }) {
       </View>
       <View style={styles.buttonRow}>
         <StyledButton 
+            testID={`btn-play-${item.id}`} // Adicionei ID por precaução
             title="Jogar" 
             onPress={() => navigation.navigate('PlayQuiz', { quizId: item.id })} 
             style={{marginRight: 10}} 
@@ -225,15 +228,20 @@ export default function DashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  
+  // Header
   topBar: { 
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
       paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1 
   },
   hamburgerButton: { padding: 5 },
   pageTitle: { fontSize: 18, fontWeight: 'bold' },
+
+  // Greeting e Ações
   greetingContainer: { padding: SIZING.padding, paddingBottom: 10, paddingTop: 20 },
   greetingText: { ...FONTS.h2, fontSize: 22 },
   actionsContainer: { padding: SIZING.padding },
+  
   bigCreateButton: { 
       padding: SIZING.padding * 2, borderRadius: 16, 
       alignItems: 'center', justifyContent: 'center', marginBottom: 15, 
@@ -241,17 +249,48 @@ const styles = StyleSheet.create({
   },
   bigButtonIcon: { color: 'white', fontSize: 32, lineHeight: 32, marginBottom: 5 },
   bigButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold', letterSpacing: 1 },
+  
   foldersButton: { borderWidth: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
   foldersButtonText: { fontWeight: '600', fontSize: 16 },
-  listHeaderContainer: { paddingHorizontal: SIZING.padding, paddingBottom: 10 },
-  sectionTitle: { ...FONTS.h2, marginRight: 15 },
-  searchWrapper: { flexDirection: 'row', borderWidth: 1, borderRadius: 25, paddingHorizontal: 15, alignItems: 'center', flex: 1, minWidth: 200, height: 45, marginTop: 5 },
-  searchInput: { flex: 1, height: '100%', outlineStyle: 'none' },
+
+  // --- BARRA DE PESQUISA ---
+  listHeaderContainer: { 
+      paddingHorizontal: SIZING.padding, paddingBottom: 10, 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      justifyContent: 'space-between' 
+  },
+  sectionTitle: { 
+      ...FONTS.h2, 
+      marginRight: 10,
+      flexShrink: 1 
+  },
+  searchWrapper: { 
+      flexDirection: 'row', 
+      borderWidth: 1, 
+      borderRadius: 20, // Mais arredondado (pílula)
+      paddingHorizontal: 12, 
+      alignItems: 'center', 
+      width: 160, // Largura fixa pequena mas funcional
+      height: 38, // Altura compacta
+      justifyContent: 'space-between'
+  },
+  searchInput: { 
+      flex: 1, 
+      height: '100%', 
+      fontSize: 14,
+      padding: 0, // Remove padding padrão do Android
+      outlineStyle: 'none' 
+  },
+
+  // Cards
   quizCard: { borderRadius: 12, padding: 15, marginHorizontal: SIZING.padding, marginBottom: 10, borderLeftWidth: 5, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 },
   quizInfo: { flex: 1 },
   quizTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
   quizSub: { fontSize: 12 },
   buttonRow: { flexDirection: 'row', alignItems: 'center' },
+  
+  // Paginação
   paginationContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 20, paddingBottom: 40 },
   pageButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   pageButtonDisabled: { opacity: 0.3 },

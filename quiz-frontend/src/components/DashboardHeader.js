@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Switch } from 'react-native';
 import { SIZING, FONTS } from '../constants/theme';
 
 export default function DashboardHeader({ 
@@ -9,36 +8,45 @@ export default function DashboardHeader({
   searchText, 
   setSearchText, 
   setCurrentPage, 
-  setMenuVisible 
+  colors, 
+  isDarkMode,
+  toggleTheme,
+  setMenuVisible,
+  logout
 }) {
-  const { colors } = useTheme();
   const displayName = user?.username ? user.username.split(' ')[0] : 'Estudante';
 
   return (
     <View>
       {/* 1. BARRA SUPERIOR COM HAMBURGUER E TÍTULO */}
       <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+          <TouchableOpacity 
+            testID="btn-hamburger" 
+            onPress={() => setMenuVisible(true)} 
+            style={styles.hamburgerButton}
+          >
               <Text style={{fontSize: 28, color: colors.text, fontWeight: 'bold'}}>☰</Text>
           </TouchableOpacity>
           
           <Text style={[styles.pageTitle, { color: colors.text }]}>Página Inicial</Text>
           
-          {/* View vazia para equilibrar o título no centro */}
           <View style={{width: 40}} /> 
       </View>
 
-      {/* 2. SAUDAÇÃO */}
+      {/* 2. SAUDAÇÃO E TEMA */}
       <View style={styles.greetingContainer}>
-          <Text style={[styles.greetingText, { color: colors.text }]}>
-            Olá, {displayName}!
-          </Text>
-          <Text style={{ color: colors.subText, fontSize: 14 }}>O que vamos estudar hoje?</Text>
+          <View>
+            <Text style={[styles.greetingText, { color: colors.text }]}>
+                Olá, {displayName}!
+            </Text>
+            <Text style={{ color: colors.subText, fontSize: 14 }}>O que vamos estudar hoje?</Text>
+          </View>
       </View>
 
-      {/* 3. AÇÕES PRINCIPAIS (CRIAR E PASTAS) */}
+      {/* 3. AÇÕES PRINCIPAIS */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
+            testID="btn-create-quiz"
             style={[styles.bigCreateButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('CreateEditQuiz')}
             activeOpacity={0.8}
@@ -48,6 +56,7 @@ export default function DashboardHeader({
         </TouchableOpacity>
 
         <TouchableOpacity 
+            testID="btn-manage-folders"
             style={[styles.foldersButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => navigation.navigate('FoldersList')}
         >
@@ -55,11 +64,16 @@ export default function DashboardHeader({
         </TouchableOpacity>
       </View>
 
-      {/* 4. BARRA DE PESQUISA */}
+      {/* 4. BARRA DE PESQUISA BONITA */}
       <View style={styles.listHeaderContainer}>
          <Text style={[styles.sectionTitle, { color: colors.text }]}>Todos os Quizzes</Text>
-         <View style={[styles.searchWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={{marginRight: 5}}>🔍</Text>
+         
+         {/* Wrapper da Pesquisa estilizado */}
+         <View style={[
+             styles.searchWrapper, 
+             { backgroundColor: colors.inputBg || '#fff', borderColor: colors.border }
+         ]}>
+            <Text style={{marginRight: 8, fontSize: 18}}>🔍</Text>
             <TextInput 
                 style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Pesquisar quiz..."
@@ -81,7 +95,10 @@ const styles = StyleSheet.create({
   hamburgerButton: { padding: 5 },
   pageTitle: { fontSize: 18, fontWeight: 'bold' },
 
-  greetingContainer: { padding: SIZING.padding, paddingBottom: 10 },
+  greetingContainer: { 
+      padding: SIZING.padding, paddingBottom: 10, paddingTop: 20,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+  },
   greetingText: { ...FONTS.h2, fontSize: 22 },
   
   actionsContainer: { padding: SIZING.padding },
@@ -96,8 +113,28 @@ const styles = StyleSheet.create({
   foldersButton: { borderWidth: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
   foldersButtonText: { fontWeight: '600', fontSize: 16 },
 
-  listHeaderContainer: { paddingHorizontal: SIZING.padding, paddingBottom: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { ...FONTS.h2, marginRight: 15 },
-  searchWrapper: { flexDirection: 'row', borderWidth: 1, borderRadius: 25, paddingHorizontal: 15, alignItems: 'center', flex: 1, minWidth: 200, height: 45, marginTop: 5 },
-  searchInput: { flex: 1, height: '100%', outlineStyle: 'none' },
+  listHeaderContainer: { 
+      paddingHorizontal: SIZING.padding, paddingBottom: 15, 
+      flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' 
+  },
+  sectionTitle: { ...FONTS.h2, marginRight: 15, marginBottom: 10 },
+  
+  // ESTILO DA BARRA DE PESQUISA
+  searchWrapper: { 
+      flexDirection: 'row', 
+      borderWidth: 1, 
+      borderRadius: 12, // Mais arredondado
+      paddingHorizontal: 15, 
+      alignItems: 'center', 
+      flex: 1, 
+      minWidth: 200, 
+      height: 50, // Altura fixa confortável
+      marginTop: 5
+  },
+  searchInput: { 
+      flex: 1, 
+      height: '100%', 
+      fontSize: 16,
+      outlineStyle: 'none' 
+  },
 });

@@ -5,13 +5,13 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getFolderDetails, deleteQuiz, removeQuizzesFromFolder } from '../services/api';
-import { useTheme } from '../context/ThemeContext'; // Hook do Tema
+import { useTheme } from '../context/ThemeContext';
 import { SIZING, FONTS } from '../constants/theme';
 import StyledButton from '../components/StyledButton';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 export default function FolderScreen({ route }) {
-  const { colors } = useTheme(); // Hook do Tema
+  const { colors } = useTheme();
   const { folderId } = route.params;
   const navigation = useNavigation();
 
@@ -19,22 +19,19 @@ export default function FolderScreen({ route }) {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados de Seleção (Bulk Action)
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedQuizIds, setSelectedQuizIds] = useState([]);
 
-  // Estados de Modal (Deleção Individual)
   const [modalVisible, setModalVisible] = useState(false);
   const [quizToDelete, setQuizToDelete] = useState(null); 
 
-  // Configura o Header com botão "Gerenciar"
   useEffect(() => {
     if (folder) {
       navigation.setOptions({ 
         title: folder.name,
         headerRight: () => (
           <TouchableOpacity 
-            testID="btn-folder-manage" // ID para Selenium
+            testID="btn-folder-manage"
             onPress={toggleSelectionMode} 
             style={{ marginRight: 15 }}
           >
@@ -64,12 +61,10 @@ export default function FolderScreen({ route }) {
   useEffect(() => {
     fetchData();
   }, [folderId]);
-
-  // --- LÓGICA DE SELEÇÃO MÚLTIPLA ---
   
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
-    setSelectedQuizIds([]); // Limpa seleção ao sair/entrar
+    setSelectedQuizIds([]); 
   };
 
   const toggleQuizSelection = (id) => {
@@ -83,7 +78,6 @@ export default function FolderScreen({ route }) {
   const handleBulkRemove = async () => {
     if (selectedQuizIds.length === 0) return;
 
-    // Lógica para Web e Mobile
     const executeRemove = async () => {
         try {
             setLoading(true);
@@ -109,8 +103,6 @@ export default function FolderScreen({ route }) {
     }
   };
 
-  // --- LÓGICA NORMAL (Play All, Deletar Unitário) ---
-
   const handlePlayAll = () => {
       if (quizzes.length === 0) {
           Alert.alert("Vazio", "Não há quizzes para jogar.");
@@ -129,7 +121,6 @@ export default function FolderScreen({ route }) {
     setQuizToDelete(null);
   };
   
-  // Deleta o quiz do sistema (Ação Destrutiva)
   const handleDeleteConfirm = async () => {
     if (!quizToDelete) return;
     try {
@@ -147,14 +138,13 @@ export default function FolderScreen({ route }) {
 
     return (
       <TouchableOpacity 
-        testID={`quiz-item-${item.id}`} // ID para Selenium (pode usar ID ou Título)
+        testID={`quiz-item-${item.title}`} 
         style={[
           styles.card, 
           { backgroundColor: colors.card, borderColor: colors.border },
           isSelected && { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.inputBg }
         ]}
         onPress={() => {
-          // Se estiver em modo de seleção, clica para marcar. Senão, não faz nada no card inteiro.
           if (selectionMode) toggleQuizSelection(item.id);
         }}
         activeOpacity={selectionMode ? 0.7 : 1}
@@ -162,7 +152,6 @@ export default function FolderScreen({ route }) {
         <View style={styles.cardContent}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
             
-            {/* CHECKBOX VISUAL */}
             {selectionMode && (
                 <View style={[
                     styles.checkbox, 
@@ -174,17 +163,21 @@ export default function FolderScreen({ route }) {
             )}
         </View>
 
-        {/* SUBTITULO / INFO DO QUIZ */}
         <View style={{marginBottom: 10}}>
              <Text style={{color: colors.subText, fontSize: 12}}>
                 {item.timePerQuestion > 0 ? `⏱️ ${item.timePerQuestion}s` : 'Sem tempo limite'}
              </Text>
         </View>
 
-        {/* Botões só aparecem se NÃO estiver selecionando */}
         {!selectionMode && (
           <View style={styles.buttonRow}>
-            <StyledButton title="Jogar" onPress={() => navigation.navigate('PlayQuiz', { quizId: item.id })} color="primary"/>
+            {/* CORREÇÃO AQUI: ADICIONADO testID="btn-play" */}
+            <StyledButton 
+                testID="btn-play" 
+                title="Jogar" 
+                onPress={() => navigation.navigate('PlayQuiz', { quizId: item.id })} 
+                color="primary"
+            />
             <StyledButton title="Editar" color="secondary" onPress={() => navigation.navigate('CreateEditQuiz', { quizId: item.id })} />
             <StyledButton title="Deletar" color="danger" onPress={() => openDeleteModal(item)} />
           </View>
@@ -216,10 +209,9 @@ export default function FolderScreen({ route }) {
                     }
                 </Text>
                 
-                {/* BOTÃO JOGAR TODOS (Só aparece se não estiver em seleção e tiver quizzes) */}
                 {!selectionMode && quizzes.length > 0 && (
                     <StyledButton 
-                        testID="btn-play-all" // ID para Selenium
+                        testID="btn-play-all" 
                         title="▶ Jogar Todos em Sequência" 
                         color="success"
                         onPress={handlePlayAll} 
@@ -234,14 +226,13 @@ export default function FolderScreen({ route }) {
         }
       />
 
-      {/* BARRA INFERIOR (Bulk Action) */}
       {selectionMode && selectedQuizIds.length > 0 && (
           <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
               <Text style={{color: colors.text, fontWeight: 'bold'}}>
                   {selectedQuizIds.length} itens selecionados
               </Text>
               <TouchableOpacity 
-                  testID="btn-remove-from-folder" // ID para Selenium
+                  testID="btn-remove-from-folder"
                   style={[styles.removeButton, {backgroundColor: colors.danger}]}
                   onPress={handleBulkRemove}
               >
@@ -250,7 +241,6 @@ export default function FolderScreen({ route }) {
           </View>
       )}
 
-      {/* Modal de Deleção Unitária */}
       {quizToDelete && (
         <ConfirmationModal
           visible={modalVisible}
@@ -267,81 +257,23 @@ export default function FolderScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: SIZING.padding,
-  },
-  headerContainer: {
-      marginBottom: SIZING.margin
-  },
-  title: {
-    ...FONTS.h2,
-    marginBottom: 10,
-  },
-  helpText: {
-      fontSize: 14,
-      fontStyle: 'italic',
-      marginBottom: 10
-  },
+  container: { flex: 1, padding: SIZING.padding },
+  headerContainer: { marginBottom: SIZING.margin },
+  title: { ...FONTS.h2, marginBottom: 10 },
+  helpText: { fontSize: 14, fontStyle: 'italic', marginBottom: 10 },
   card: {
-    borderRadius: SIZING.radius,
-    padding: SIZING.padding,
-    marginBottom: SIZING.margin,
-    borderWidth: 1,
-    ...Platform.select({
-        web: { boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
-        default: { elevation: 2 }
-    })
+    borderRadius: SIZING.radius, padding: SIZING.padding, marginBottom: SIZING.margin, borderWidth: 1,
+    ...Platform.select({ web: { boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }, default: { elevation: 2 } })
   },
-  cardContent: { 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      justifyContent: 'space-between',
-      marginBottom: 5
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZING.base,
-    marginTop: 5
-  },
-  emptyText: {
-    ...FONTS.body,
-    textAlign: 'center',
-    marginTop: 50,
-  },
-  checkbox: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      borderWidth: 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: 10
-  },
+  cardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', flex: 1 },
+  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZING.base, marginTop: 5 },
+  emptyText: { ...FONTS.body, textAlign: 'center', marginTop: 50 },
+  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
   bottomBar: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      padding: 15,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      borderTopWidth: 1,
-      ...Platform.select({
-        web: { boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' },
-        default: { elevation: 10 }
-      })
+      position: 'absolute', bottom: 0, left: 0, right: 0, padding: 15,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1,
+      ...Platform.select({ web: { boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }, default: { elevation: 10 } })
   },
-  removeButton: {
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      borderRadius: 8
-  }
+  removeButton: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }
 });
