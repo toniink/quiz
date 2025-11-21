@@ -54,31 +54,36 @@ O projeto implementa uma aplicação completa com:
 ---
 ## 📂 ESTRUTURA DO REPOSITÓRIO
 ```
-/quiz  
-│  
-├── backend/  
-│   ├── index.js  
-│   ├── authMiddleware.js  
-│   ├── database.js  
-│   ├── package.json  
-│   ├── tests/   (automação e performance)  
-│   │  
-│   └── evidence/  
-│         ├── prints/  
-│         ├── videos/  
-│         └── logs/  
-│  
-├── mobile/  
-│   ├── App.js  
-│   ├── src/  
-│   │   ├── context/AuthContext.js  
-│   │   ├── navigation/AppNavigator.js  
-│   │   ├── screens/  
-│  
-└── docs/  
-    ├── Documento_de_Testes.pdf  
-    ├── Roteiro_de_Automacao.pdf  
-    └── Apresentacao_Final.pdf  
+src/  
+├── components/         # Componentes visuais reutilizáveis  
+│   ├── DashboardHeader.js  
+│   ├── HamburgerMenu.js  
+│   ├── StyledButton.js  
+│   └── ConfirmationModal.js  
+├── constants/          # Configurações estáticas  
+│   └── theme.js        # Paletas de cores (Dark/Light) e fontes  
+├── context/            # Gestão de estado global  
+│   ├── AuthContext.js  # Login, Logout, Token  
+│   └── ThemeContext.js # Controle Dark/Light Mode  
+├── navigation/         # Configuração de rotas  
+│   └── AppNavigator.js # Stack Navigator  
+├── screens/            # Telas da aplicação  
+│   ├── DashboardScreen.js  
+│   ├── CreateEditQuizScreen.js  
+│   ├── FoldersListScreen.js  
+│   ├── FolderScreen.js  
+│   ├── PlayQuizScreen.js  
+│   ├── ResultsScreen.js  
+│   ├── LoginScreen.js  
+│   ├── RegisterScreen.js  
+│   ├── ProfileScreen.js  
+│   └── HelpScreen.js  
+├── services/           # Comunicação com Backend  
+│   └── api.js          # Configuração Axios e Endpoints  
+└── utils/              # Lógica pura e helpers  
+    ├── quizLogic.js  
+    ├── validators.js  
+    └── helpers.js 
  ```  
 ---
 
