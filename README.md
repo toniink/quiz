@@ -47,7 +47,7 @@ O projeto implementa uma aplicação completa com:
 -   Jest
 -	Automação:
     - Selenium WebDriver
-    -	Python + Pytest
+    -	Python
 -	Performance:
     -	Locust
 
@@ -100,21 +100,17 @@ http://localhost:4000
 npm install
 2.	Inicie o Expo:
 npx expo start
-3.	Abra no celular via QR Code ou emulador.
+3.	Abra no celular via QR Code/emulador ou web.
 
 ## Testes Automatizados
-1) Testes de Sistema (documentados)  
-Arquivo PDF em:  /docs/Documento_de_Testes.pdf
-Inclui:  
--	Plano de Testes  
--	Matriz de rastreabilidade  
--	Casos de Teste  
--	Entradas, ações e resultados esperados  
-2) Testes de Performance (Locust)  
+1) Testes de Sistema
+   - São rodados com `npm test`.
+
+3) Testes de Performance (Locust)  
 Executar:  
-`locust -f tests/performance/locustfile.py`  
+`python -m locust -f locustfile.py --host http://localhost:4000`  
 Acessar interface gráfica:  
-http://localhost:8089  
+http://localhost:4000  
 Cenários avaliados:  
 -	Carga de usuários simultâneos  
 -	Latência de criação de quiz  
@@ -126,8 +122,6 @@ Localizadas em:
 /evidence
 Incluem:
 -	Prints
--	Vídeos
--	Logs dos testes Selenium
 -	Relatórios de performance Locust
 
 ---
